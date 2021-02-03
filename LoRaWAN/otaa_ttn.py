@@ -20,14 +20,18 @@ class LoRaWANotaa(LoRa):
 
         self.clear_irq_flags(RxDone=1)
         payload = self.read_payload(nocheck=True)
+        print(bytes(payload[:]))
 
         lorawan = LoRaWAN.new([], appkey)
         lorawan.read(payload)
+        print(payload)
         print(lorawan.get_payload())
+        
         print(lorawan.get_mhdr().get_mversion())
 
         if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
-            print("Got LoRaWAN join accept")
+        #if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
+            print("Got LoRaWAN join request")
             print(lorawan.valid_mic())
             print(lorawan.get_devaddr())
             print(lorawan.derive_nwskey(devnonce))
@@ -35,7 +39,7 @@ class LoRaWANotaa(LoRa):
             print("\n")
             sys.exit(0)
 
-        print("Got LoRaWAN message continue listen for join accept")
+        print("Got LoRaWAN message continue listen for join request")
 
     def on_tx_done(self):
         self.clear_irq_flags(TxDone=1)
@@ -69,12 +73,13 @@ lora = LoRaWANotaa(False)
 # Setup
 lora.set_mode(MODE.SLEEP)
 lora.set_dio_mapping([1,0,0,0,0,0])
-lora.set_freq(868.1)
+lora.set_freq(433.175)
 lora.set_pa_config(pa_select=1)
-lora.set_spreading_factor(7)
+lora.set_spreading_factor(8)
 lora.set_pa_config(max_power=0x0F, output_power=0x0E)
 lora.set_sync_word(0x34)
 lora.set_rx_crc(True)
+#lora.set_mode(MODE.RXCONT)
 
 print(lora)
 assert(lora.get_agc_auto_on() == 1)

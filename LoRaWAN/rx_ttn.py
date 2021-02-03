@@ -11,6 +11,10 @@ parser = LoRaArgumentParser("LoRaWAN receiver")
 class LoRaWANrcv(LoRa):
     def __init__(self, verbose = False):
         super(LoRaWANrcv, self).__init__(verbose)
+        self.set_mode(MODE.SLEEP)
+        self.set_dio_mapping([0]*6)
+        self.key = bytes([0x30] * 16)
+        self.iv = bytes([0x00] * 16)
 
     def on_rx_done(self):
         print("RxDone")
@@ -37,7 +41,8 @@ class LoRaWANrcv(LoRa):
         self.reset_ptr_rx()
         self.set_mode(MODE.RXCONT)
         while True:
-            sleep(.5)
+            sleep(.1)
+            sys.stdout.flush()
 
 
 # Init
@@ -45,15 +50,16 @@ class LoRaWANrcv(LoRa):
 #appskey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC1, 0x45, 0x6E, 0xC5, 0x45]
 nwskey = [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30]
 appskey = [0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30]
-lora = LoRaWANrcv(False)
+lora = LoRaWANrcv(verbose=False)
 
 # Setup
-lora.set_mode(MODE.SLEEP)
+lora.set_mode(MODE.STDBY)
 lora.set_dio_mapping([0] * 6)
 lora.set_freq(433.175)
 lora.set_pa_config(pa_select=1)
-lora.set_spreading_factor(7)
-lora.set_sync_word(0x34)
+lora.set_spreading_factor(8)
+#lora.set_spreading_factor(12)
+#lora.set_sync_word(0x34)
 lora.set_rx_crc(True)
 
 print(lora)
