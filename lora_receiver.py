@@ -21,7 +21,7 @@ class LoRaRcvCont(LoRa):
         self.reset_ptr_rx()
         self.set_mode(MODE.RXCONT)
         while True:
-            sleep(.5)
+            sleep(.1)
             rssi_value = self.get_rssi_value()
             status = self.get_modem_status()
             sys.stdout.flush()
@@ -41,6 +41,9 @@ class LoRaRcvCont(LoRa):
 lora = LoRaRcvCont(verbose=False)
 lora.set_mode(MODE.STDBY)
 lora.set_rx_crc(True)
+lora.set_freq(433.175)
+
+print("RECEIVER")
 #  Medium Range  Defaults after init are 434.0MHz, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on 13 dBm
 
 lora.set_pa_config(pa_select=1)
