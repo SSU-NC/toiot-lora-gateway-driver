@@ -16,6 +16,7 @@ class PhyPayload:
         if len(packet) < 12:
             raise MalformedPacketException("Invalid lorawan packet");
 
+        print("MHDR bits: " + str(format(packet[0],'08b')))
         self.mhdr = MHDR(packet[0])
         self.set_direction()
         self.mac_payload = MacPayload()
