@@ -1,0 +1,4 @@
+getmac
+spi-dev
+RPI.GPIO
+
