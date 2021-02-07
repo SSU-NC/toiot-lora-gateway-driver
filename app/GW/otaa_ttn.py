@@ -30,8 +30,7 @@ class LoRaWANotaa(LoRa):
         print(lorawan.get_mhdr().get_mversion())
 
         if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
-        #if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
-            print("Got LoRaWAN join request")
+            print("Got LoRaWAN join accept")
             print(lorawan.valid_mic())
             print(lorawan.get_devaddr())
             print(lorawan.derive_nwskey(devnonce))
@@ -39,7 +38,7 @@ class LoRaWANotaa(LoRa):
             print("\n")
             sys.exit(0)
 
-        print("Got LoRaWAN message continue listen for join request")
+        print("Got LoRaWAN message continue listen for join accept")
 
     def on_tx_done(self):
         self.clear_irq_flags(TxDone=1)
