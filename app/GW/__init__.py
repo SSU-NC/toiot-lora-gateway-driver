@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 from time import sleep
-from SX127x.LoRa import *
-from SX127x.LoRaArgumentParser import LoRaArgumentParser
-from SX127x.board_config import BOARD
+from .SX127x.LoRa import *
+from .SX127x.LoRaArgumentParser import LoRaArgumentParser
+from .SX127x.board_config import BOARD
 from random import randrange
 import paho.mqtt.client as mqtt
 
@@ -19,8 +19,9 @@ class LoRaWANrcv(LoRa):
     def __init__(self, verbose = False):
         super(LoRaWANrcv, self).__init__(verbose)
         self.set_mode(MODE.SLEEP)
-        self.set_dio_mapping([0]*6)
-        self.usedDevnonce=[]
+        self.reset_ptr_rx()
+        #self.set_dio_mapping([1,0,0,0,0,0])
+        self.usedDevnonce=set()
 
     def on_rx_done(self):
         print("-------------------------------------RxDone")
@@ -40,14 +41,16 @@ class LoRaWANrcv(LoRa):
             print("Got LoRaWAN JOIN_REQUEST")
             if lorawan.get_devnonce() in self.usedDevnonce:
                 print("Error: Received devnonce has been used already!")
-                exit(1)
-            self.usedDevnonce+=[lorawan.get_devnonce()]
+                #exit(1)
+            self.usedDevnonce|={lorawan.get_devnonce()}
             
             lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
-            sleep(0.5)
-            self.write_payload(lorawan.to_raw())
+            
+            print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
+            print(self.get_dio_mapping())
             self.set_mode(MODE.TX)
+            #self.set_dio_mapping([1,0,0,0,0,0])
 
         elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
             print("received message: "+"".join(list(map(chr, lorawan.get_payload()))))
@@ -55,26 +58,32 @@ class LoRaWANrcv(LoRa):
             self.set_mode(MODE.SLEEP)
             self.reset_ptr_rx()
             self.set_mode(MODE.RXCONT)
-        
-        print("--------------------------------------------\n")
 
+        print("--------------------------------------------\n")
+        self.reset_ptr_rx()
+        self.set_mode(MODE.RXCONT)
     def on_tx_done(self):
         self.set_mode(MODE.STDBY)
-        #self.clear_irq_flags(TxDone=1)
-        print("TxDone------------>>>>>")
-        #self.set_mode(MODE.SLEEP)
-        #self.reset_ptr_rc()
-        #self.set_mode(MODE.RXCONT)
+        self.clear_irq_flags(TxDone=1)
+        print("======================================>TX_DONE!")
+        self.set_dio_mapping([0]*6)
+        self.reset_ptr_rx()
+        self.set_mode(MODE.RXCONT)
 
     def start(self):
         self.tx_counter=0
+        self.reset_ptr_rx()
+        self.set_mode(MODE.RXCONT)
         while True:
+            sleep(.1)
+            sys.stdout.flush()
+            '''
             self.reset_ptr_rx()
             self.set_mode(MODE.RXCONT)
             while True:
                 sleep(.1)
                 sys.stdout.flush()
-
+            '''
 def Init_client(cname):
     # callback assignment
     client = mqtt.Client(cname, False) #do not use clean session
@@ -163,11 +172,11 @@ lora = LoRaWANrcv(verbose=False)
 lora.set_mode(MODE.STDBY)
 lora.set_dio_mapping([0] * 6)
 lora.set_freq(433.175)
-lora.set_pa_config(pa_select=1)
+lora.set_pa_config(pa_select=1, max_power=0x0F, output_power=0x0E)
 lora.set_spreading_factor(8)
 #lora.set_sync_word(0x34)
 lora.set_rx_crc(True)
-
+lora.set_tx(True)
 print(lora)
 assert(lora.get_agc_auto_on() == 1)
 try:

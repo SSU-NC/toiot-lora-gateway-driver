@@ -1,3 +1,3 @@
-from GW import app, args
+from GW import args
 import os
 
