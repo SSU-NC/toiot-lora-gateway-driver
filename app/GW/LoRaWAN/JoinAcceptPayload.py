@@ -12,13 +12,30 @@ class JoinAcceptPayload:
             raise MalformedPacketException("Invalid join accept");
         self.encrypted_payload = payload
 
-    def create(self, args):
-        pass
+    def create(self, key, mhdr, args):
+        self.mhdr = mhdr
+        self.key = key
+        self.appnonce = args['appnonce']
+        self.netid = args['netid']
+        self.devaddr = args['devaddr']
+        self.dlsettings = args['dlsettings']
+        self.rxdelay = args['rxdelay']
+        self.cflist = args['cflist']
 
     def length(self):
         return len(self.encrypted_payload)
-
+    
     def to_raw(self):
+        self.payload = []
+        self.payload += self.appnonce
+        self.payload += self.netid
+        self.payload += self.devaddr
+        self.payload += self.dlsettings
+        self.payload += self.rxdelay
+        self.payload += self.cflist
+        #return self.payload
+        #self.encrypted_payload=[]
+        self.encrypted_payload = self.encrypt_payload(self.key, 1)
         return self.encrypted_payload
 
     def to_clear_raw(self):
@@ -42,12 +59,13 @@ class JoinAcceptPayload:
     def get_cflist(self):
         return self.cflist
 
-    def compute_mic(self, key, direction, mhdr):
+    def compute_mic(self, key, direction):
         mic = []
-        mic += [mhdr.to_raw()]
+        mic += [self.mhdr.to_raw()]
         mic += self.to_clear_raw()
 
         cmac = AES_CMAC()
+        print(bytes(key))
         computed_mic = cmac.encode(bytes(key), bytes(mic))[:4]
         return list(map(int, computed_mic))
 
@@ -56,7 +74,7 @@ class JoinAcceptPayload:
         a += self.encrypted_payload
         a += mic
 
-        cipher = AES.new(bytes(key))
+        cipher = AES.new(bytes(key), AES.MODE_ECB)
         self.payload = cipher.encrypt(bytes(a))[:-4]
 
         self.appnonce = self.payload[:3]
@@ -70,13 +88,14 @@ class JoinAcceptPayload:
 
         return list(map(int, self.payload))
 
-    def encrypt_payload(self, key, direction, mhdr):
+    def encrypt_payload(self, key, direction):
         a = []
         a += self.to_clear_raw()
-        a += self.compute_mic(key, direction, mhdr)
+        a += self.compute_mic(key, direction)
 
-        cipher = AES.new(bytes(key))
+        cipher = AES.new(bytes(key), AES.MODE_ECB)
         return list(map(int, cipher.decrypt(bytes(a))))
+
 
     def derive_nwskey(self, key, devnonce):
         a = [0x01]

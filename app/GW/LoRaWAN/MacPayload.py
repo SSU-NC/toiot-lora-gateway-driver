@@ -29,7 +29,7 @@ class MacPayload:
             self.frm_payload = DataPayload()
             self.frm_payload.read(self, mac_payload[self.fhdr.length() + 1:])
 
-    def create(self, mtype, key, args):
+    def create(self, mhdr, mtype, key, args):
         self.fhdr = FHDR()
         self.fhdr.create(mtype, args)
         self.fport = 0x01
@@ -39,7 +39,7 @@ class MacPayload:
             self.frm_payload.create(args)
         if mtype == MHDR.JOIN_ACCEPT:
             self.frm_payload = JoinAcceptPayload()
-            self.frm_payload.create(args)
+            self.frm_payload.create(key, mhdr, args)
         if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.UNCONF_DATA_DOWN or\
                 mtype == MHDR.CONF_DATA_UP or mtype == MHDR.CONF_DATA_DOWN:
             self.frm_payload = DataPayload()

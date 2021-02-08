@@ -9,4 +9,4 @@ See: https://www.lora-alliance.org/portals/0/specs/LoRaWAN%20Specification%201R0
 Just git clone and check rx_ttn.py for reading LoRaWAN messages and tx_ttn.py for sending LoRaWAN messages.
 
 ## TODO
-Make code more readable and easier to use
+Should implement MAC Commands.

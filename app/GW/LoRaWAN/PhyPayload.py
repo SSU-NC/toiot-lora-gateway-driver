@@ -27,7 +27,8 @@ class PhyPayload:
         self.mhdr = MHDR(mhdr)
         self.set_direction()
         self.mac_payload = MacPayload()
-        self.mac_payload.create(self.get_mhdr().get_mtype(), self.appkey, args)
+        self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
+        #self.mac_payload.create(self.get_mhdr().get_mtype(), self.appkey, args)
         self.mic = None
 
     def length(self):
@@ -67,7 +68,7 @@ class PhyPayload:
 
     def compute_mic(self):
         if self.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
-            return self.mac_payload.frm_payload.encrypt_payload(self.appkey, self.get_direction(), self.get_mhdr())[-4:]
+            return self.mac_payload.frm_payload.encrypt_payload(self.appkey, self.get_direction())[-4:]
         else:
             return self.mac_payload.frm_payload.compute_mic(self.nwkey, self.get_direction(), self.get_mhdr())
 
@@ -76,6 +77,10 @@ class PhyPayload:
             return self.get_mic() == self.mac_payload.frm_payload.encrypt_payload(self.appkey, self.get_direction(), self.get_mhdr())[-4:]
         else:
             return self.get_mic() == self.mac_payload.frm_payload.compute_mic(self.nwkey, self.get_direction(), self.get_mhdr())
+
+    def get_devnonce(self):
+        if self.get_mhdr().get_mtype == MHDR.JOIN_REQUEST:
+            return self.mac_payload.frm_payload.get_devnonce()
 
     def get_devaddr(self):
         if self.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
