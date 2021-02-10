@@ -76,14 +76,12 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.RXCONT)
         while True:
             sleep(.1)
-            sys.stdout.flush()
-            '''
             self.reset_ptr_rx()
             self.set_mode(MODE.RXCONT)
             while True:
                 sleep(.1)
                 sys.stdout.flush()
-            '''
+            
 def Init_client(cname):
     # callback assignment
     client = mqtt.Client(cname, False) #do not use clean session
@@ -136,7 +134,7 @@ def on_disconnect(client, userdata, rc):
 # Init
 appnonce = [randrange(256), randrange(256), randrange(256)]
 netid = [0x00,0x00,0x01] #Type=0, NetID=1
-devaddr = [0x00, 0x00, 0x00, 0x00]
+devaddr = [0x26, 0x01, 0x11, 0x5F]
 dlsettings = [0x00]
 rxdelay = [0x00]
 cflist = []
@@ -176,7 +174,6 @@ lora.set_pa_config(pa_select=1, max_power=0x0F, output_power=0x0E)
 lora.set_spreading_factor(8)
 #lora.set_sync_word(0x34)
 lora.set_rx_crc(True)
-lora.set_tx(True)
 print(lora)
 assert(lora.get_agc_auto_on() == 1)
 try:

@@ -83,6 +83,8 @@ class DataPayload:
 
     def encrypt_payload(self, key, direction, data):
         k = int(math.ceil(len(data) / 16.0))
+        if int(math.ceil(len(data) % 16.0)):
+            k+=1
 
         a = []
         for i in range(k):
@@ -98,7 +100,7 @@ class DataPayload:
 
         cipher = AES.new(bytes(key), AES.MODE_ECB)
         s = cipher.encrypt(bytes(a))
-
+        print("S: ",list(map(int,s)))
         padded_payload = []
         for i in range(k):
             idx = (i + 1) * 16
@@ -107,4 +109,5 @@ class DataPayload:
         payload = []
         for i in range(len(data)):
             payload += [s[i] ^ padded_payload[i]]
+        #print("encrypted Paylaod: ", list(map(int, payload)))
         return list(map(int, payload))
