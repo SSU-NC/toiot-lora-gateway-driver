@@ -21,6 +21,8 @@ class LoRaWANsend(LoRa):
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("TxDone")
+        self.set_invert_iq(1)
+        self.set_invert_iq2(1)
         self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
@@ -29,8 +31,9 @@ class LoRaWANsend(LoRa):
 
     def start(self):
         self.lorawan = LoRaWAN.new(nwskey, appskey)
+        self.set_invert_iq(1)
+        self.set_invert_iq2(1)
         self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
-
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
         while True:
@@ -50,7 +53,7 @@ lora.set_freq(433.175)
 lora.set_pa_config(pa_select=1)
 lora.set_spreading_factor(8)
 lora.set_pa_config(max_power=0x0F, output_power=0x0E)
-lora.set_sync_word(0x34)
+#lora.set_sync_word(0x34)
 lora.set_rx_crc(True)
 
 print(lora)

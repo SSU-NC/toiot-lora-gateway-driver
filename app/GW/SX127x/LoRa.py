@@ -577,14 +577,26 @@ class LoRa(object):
         loc = {s: current[s] if loc[s] is None else loc[s] for s in loc}
         val = (loc['low_data_rate_optim'] << 3) | (loc['agc_auto_on'] << 2)
         return self.spi.xfer([REG.LORA.MODEM_CONFIG_3 | 0x80, val])[1]
-
+    '''
+    def set_invert_iq(self, invert):
+        if invert == 0:
+            self.set_invert_iq1(0x27)
+            self.set_invert_iq2(0x1D)
+        else:
+            self.set_invert_iq1(0x67)
+            self.set_invert_iq2(0x19)
+    '''
     @setter(REG.LORA.INVERT_IQ)
     def set_invert_iq(self, invert):
         """ Invert the LoRa I and Q signals
         :param invert: 0: normal mode, 1: I and Q inverted
         :return: New value of register
         """
-        return 0x27 | (invert & 0x01) << 6
+        if invert == 0:
+            return 0x27
+        else:
+            return 0x66
+        #return 0x27 | ((invert & 0x01) << 6)
         
     @getter(REG.LORA.INVERT_IQ)
     def get_invert_iq(self, val):
@@ -592,6 +604,25 @@ class LoRa(object):
         :return: 0: normal mode, 1: I and Q inverted
         """
         return (val >> 6) & 0x01
+     
+    @setter(REG.LORA.INVERT_IQ2)
+    def set_invert_iq2(self, invert):
+        """ Invert the LoRa I and Q signals
+        :param invert: 0: normal mode, 1: I and Q inverted
+        :return: New value of register
+        """
+        if invert == 0:
+            return 0x1D
+        else:
+            return 0x19
+        
+    @getter(REG.LORA.INVERT_IQ2)
+    def get_invert_iq2(self, val):
+        """ Get the invert the I and Q setting
+        :return: 0: normal mode, 1: I and Q inverted
+        """
+        return (val >> 6) & 0x01
+
 
     def get_agc_auto_on(self):
         return self.get_modem_config_3()['agc_auto_on']
@@ -1468,6 +1499,27 @@ class LoRa2(object):
         loc = {s: current[s] if loc[s] is None else loc[s] for s in loc}
         val = (loc['low_data_rate_optim'] << 3) | (loc['agc_auto_on'] << 2)
         return self.spi.xfer([REG.LORA.MODEM_CONFIG_3 | 0x80, val])[1]
+    '''
+    def set_invert_iq(self, invert):
+        if invert == 0:
+            self.set_invert_iq1(0x27)
+            #self.set_invert_iq2(0x1D)
+        else:
+            self.set_invert_iq1(0x67)
+            #self.set_invert_iq2(0x19)
+    @setter(REG.LORA.INVERT_IQ1)
+    def set_invert_iq1(self, val):
+        """ Invert the LoRa I and Q signals
+        :param invert: 0: normal mode, 1: I and Q inverted
+        :return: New value of register
+        """
+        #return 0x27 | ((invert & 0x01) << 6)
+        return val
+
+    @setter(REG.LORA.INVERT_IQ2)
+    def set_invert_iq2(self, val):
+        return val
+    '''
 
     @setter(REG.LORA.INVERT_IQ)
     def set_invert_iq(self, invert):
@@ -1475,7 +1527,7 @@ class LoRa2(object):
         :param invert: 0: normal mode, 1: I and Q inverted
         :return: New value of register
         """
-        return 0x27 | (invert & 0x01) << 6
+        return 0x27 | ((invert & 0x01) << 6)
         
     @getter(REG.LORA.INVERT_IQ)
     def get_invert_iq(self, val):
