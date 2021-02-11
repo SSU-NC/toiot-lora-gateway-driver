@@ -46,41 +46,55 @@ class LoRaWANrcv(LoRa):
             
             lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
             
+            self.set_mode(MODE.STDBY)
+            self.set_invert_iq(1)
+            self.set_invert_iq2(1)
             print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
-            print(self.get_dio_mapping())
+            self.set_dio_mapping([1,0,0,0,0,0])
+            sleep(3)
             self.set_mode(MODE.TX)
-            #self.set_dio_mapping([1,0,0,0,0,0])
 
         elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
             print("received message: "+"".join(list(map(chr, lorawan.get_payload()))))
+            
             mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
-            self.set_mode(MODE.SLEEP)
+            self.set_mode(MODE.STDBY)
+            self.set_invert_iq(0)
+            self.set_invert_iq2(0)
             self.reset_ptr_rx()
             self.set_mode(MODE.RXCONT)
 
+            '''
+            lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':1, 'data':list(map(ord, 'Testing TX'))})
+            self.set_invert_iq(1)
+            self.write_payload(lorawan.to_raw())
+            self.set_dio_mapping([1,0,0,0,0,0])
+            sleep(3)
+            self.set_mode(MODE.TX)
+            '''
+
         print("--------------------------------------------\n")
-        self.reset_ptr_rx()
-        self.set_mode(MODE.RXCONT)
     def on_tx_done(self):
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("======================================>TX_DONE!")
         self.set_dio_mapping([0]*6)
+        self.set_invert_iq(0)
+        self.set_invert_iq2(0)
         self.reset_ptr_rx()
         self.set_mode(MODE.RXCONT)
 
     def start(self):
         self.tx_counter=0
+        self.set_invert_iq(0)
+        self.set_invert_iq2(0)
         self.reset_ptr_rx()
         self.set_mode(MODE.RXCONT)
         while True:
             sleep(.1)
-            self.reset_ptr_rx()
-            self.set_mode(MODE.RXCONT)
-            while True:
-                sleep(.1)
-                sys.stdout.flush()
+            
+            sys.stdout.flush()
             
 def Init_client(cname):
     # callback assignment
