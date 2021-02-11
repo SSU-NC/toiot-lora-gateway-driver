@@ -13,7 +13,7 @@ class DataPayload:
 
     def create(self, mac_payload, key, args):
         self.mac_payload = mac_payload
-        self.set_payload(key, 0x00, args['data'])
+        self.set_payload(key, 0x01, args['data'])
 
     def length(self):
         return len(self.payload)
