@@ -24,6 +24,7 @@ class LoRaWANsend(LoRa):
         self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
+        sleep(1)
 
 
     def start(self):
@@ -33,7 +34,7 @@ class LoRaWANsend(LoRa):
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
         while True:
-            sleep(1)
+            sleep(0.5)
 
 
 # Init
