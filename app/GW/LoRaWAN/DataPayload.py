@@ -14,9 +14,9 @@ class DataPayload:
 
     def create(self, mac_payload, mtype, key, args):
         self.mac_payload = mac_payload
-        if mtype == MHDR.UNCONF_DATA_UP:
+        if mtype == MHDR.UNCONF_DATA_UP:    #uplink
             self.set_payload(key, 0x00, args['data'])
-        else:
+        else:                               #downlink
             self.set_payload(key, 0x01, args['data'])
 
     def length(self):

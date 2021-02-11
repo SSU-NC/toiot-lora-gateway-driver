@@ -154,6 +154,7 @@ class REG:
         FEI_MSB            = 0x28
         DETECT_OPTIMIZE    = 0X31
         INVERT_IQ          = 0x33
+        INVERT_IQ2         = 0x3b
         DETECTION_THRESH   = 0X37
         SYNC_WORD          = 0X39
         DIO_MAPPING_1      = 0x40
