@@ -2,6 +2,7 @@
 # frm_payload: data(0..N)
 #
 from .AES_CMAC import AES_CMAC
+from .MHDR import MHDR
 from Crypto.Cipher import AES
 import math
 
@@ -11,9 +12,12 @@ class DataPayload:
         self.mac_payload = mac_payload
         self.payload = payload
 
-    def create(self, mac_payload, key, args):
+    def create(self, mac_payload, mtype, key, args):
         self.mac_payload = mac_payload
-        self.set_payload(key, 0x01, args['data'])
+        if mtype == MHDR.UNCONF_DATA_UP:
+            self.set_payload(key, 0x00, args['data'])
+        else:
+            self.set_payload(key, 0x01, args['data'])
 
     def length(self):
         return len(self.payload)
