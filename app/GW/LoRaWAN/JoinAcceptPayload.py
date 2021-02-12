@@ -21,25 +21,26 @@ class JoinAcceptPayload:
         self.dlsettings = args['dlsettings']
         self.rxdelay = args['rxdelay']
         self.cflist = args['cflist']
+        self.set_payload()
 
     def length(self):
         return len(self.encrypted_payload)
     
+    def set_payload(self):
+        self.rawpayload = []
+        self.rawpayload += self.appnonce
+        self.rawpayload += self.netid
+        self.rawpayload += self.devaddr
+        self.rawpayload += self.dlsettings
+        self.rawpayload += self.rxdelay
+        self.rawpayload += self.cflist
+        self.encrypted_payload = self.encrypt_payload(self.key, 0x01)
+
     def to_raw(self):
-        self.payload = []
-        self.payload += self.appnonce
-        self.payload += self.netid
-        self.payload += self.devaddr
-        self.payload += self.dlsettings
-        self.payload += self.rxdelay
-        self.payload += self.cflist
-        #return self.payload
-        #self.encrypted_payload=[]
-        self.encrypted_payload = self.encrypt_payload(self.key, 1)
         return self.encrypted_payload
 
     def to_clear_raw(self):
-        return self.payload
+        return self.rawpayload
 
     def get_appnonce(self):
         return self.appnonce
@@ -94,7 +95,7 @@ class JoinAcceptPayload:
         a += self.compute_mic(key, direction)
 
         cipher = AES.new(bytes(key), AES.MODE_ECB)
-        return list(map(int, cipher.decrypt(bytes(a))))
+        return list(map(int, cipher.decrypt(bytes(a)))) # Encrypt with AES_decrypt
 
 
     def derive_nwskey(self, key, devnonce):
@@ -104,7 +105,7 @@ class JoinAcceptPayload:
         a += devnonce
         a += [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
-        cipher = AES.new(bytes(key))
+        cipher = AES.new(bytes(key), AES.MODE_ECB)
         return list(map(int, cipher.encrypt(bytes(a))))
 
     def derive_appskey(self, key, devnonce):
@@ -114,5 +115,5 @@ class JoinAcceptPayload:
         a += devnonce
         a += [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
-        cipher = AES.new(bytes(key))
+        cipher = AES.new(bytes(key), AES.MODE_ECB)
         return list(map(int, cipher.encrypt(bytes(a))))

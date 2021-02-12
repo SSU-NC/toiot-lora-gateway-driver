@@ -46,15 +46,15 @@ class DataPayload:
         #Add data to it
         #print(format(mhdr.to_raw(), '08b'))
         mic += [mhdr.to_raw()]  #add mhdr
-        print("mac_payload: "+str(self.mac_payload.to_raw()))
+        #print("mac_payload: "+str(self.mac_payload.to_raw()))
         mic += self.mac_payload.to_raw() #
-        print("before compute MIC: " + str(mic))
+        #print("before compute MIC: " + str(mic))
 
         cmac = AES_CMAC()
         print(list(map(int, cmac.encode(bytes(key), bytes(mic))[:])))
         computed_mic = cmac.encode(bytes(key), bytes(mic))[:4]
 
-        print("computed MIC: " + str(list(map(int, computed_mic))))
+        #print("computed MIC: " + str(list(map(int, computed_mic))))
         return list(map(int, computed_mic))
 
     def decrypt_payload(self, key, direction, mic):
@@ -74,7 +74,7 @@ class DataPayload:
 
         cipher = AES.new(bytes(key), AES.MODE_ECB)
         s = cipher.encrypt(bytes(a))
-
+        
         padded_payload = []
         for i in range(k):
             idx = (i + 1) * 16
