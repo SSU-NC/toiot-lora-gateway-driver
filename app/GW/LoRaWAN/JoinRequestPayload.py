@@ -13,6 +13,7 @@ class JoinRequestPayload:
         self.deveui = payload[8:16]
         self.appeui = payload[:8]
         self.devnonce = payload[16:18]
+        print(self.devnonce)
 
     def create(self, args):
         self.deveui = list(reversed(args['deveui']))

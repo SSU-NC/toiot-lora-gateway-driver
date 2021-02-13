@@ -11,7 +11,7 @@ class PhyPayload:
     def __init__(self, nwkey, appkey):
         self.nwkey = nwkey
         self.appkey = appkey
-
+    
     def read(self, packet):
         if len(packet) < 12:
             raise MalformedPacketException("Invalid lorawan packet");
@@ -28,7 +28,6 @@ class PhyPayload:
         self.set_direction()
         self.mac_payload = MacPayload()
         self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
-        #self.mac_payload.create(self.get_mhdr().get_mtype(), self.appkey, args)
         self.mic = None
 
     def length(self):
@@ -68,13 +67,13 @@ class PhyPayload:
 
     def compute_mic(self):
         if self.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
-            return self.mac_payload.frm_payload.encrypt_payload(self.appkey, self.get_direction())[-4:]
+            return []
         else:
             return self.mac_payload.frm_payload.compute_mic(self.nwkey, self.get_direction(), self.get_mhdr())
 
     def valid_mic(self):
         if self.get_mhdr().get_mtype() == MHDR.JOIN_ACCEPT:
-            return self.get_mic() == self.mac_payload.frm_payload.encrypt_payload(self.appkey, self.get_direction(), self.get_mhdr())[-4:]
+            return self.get_mic() == self.mac_payload.frm_payload.compute_mic(self.appkey, self.get_direction(), self.get_mhdr())
         else:
             return self.get_mic() == self.mac_payload.frm_payload.compute_mic(self.nwkey, self.get_direction(), self.get_mhdr())
 
@@ -92,7 +91,9 @@ class PhyPayload:
         return self.mac_payload.frm_payload.decrypt_payload(self.appkey, self.get_direction(), self.mic)
 
     def derive_nwskey(self, devnonce):
-        return self.mac_payload.frm_payload.derive_nwskey(self.appkey, devnonce)
+        self.nwkey = self.mac_payload.frm_payload.derive_nwskey(self.appkey, devnonce)
+        return self.nwkey
 
     def derive_appskey(self, devnonce):
-        return self.mac_payload.frm_payload.derive_appskey(self.appkey, devnonce)
+        self.appkey = self.mac_payload.frm_payload.derive_appskey(self.appkey, devnonce)
+        return self.appkey
