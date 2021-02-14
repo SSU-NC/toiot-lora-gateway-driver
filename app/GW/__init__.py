@@ -11,6 +11,7 @@ import getmac
 from .setup import args
 import GW.LoRaWAN
 from .LoRaWAN.MHDR import MHDR
+from .LoRaWAN.LoRaMAC import LoRaMAC
 
 BOARD.setup()
 parser = LoRaArgumentParser("LoRaWAN receiver")
@@ -22,8 +23,8 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
     def on_rx_done(self):
+        correct_fcnt = False
         print("-------------------------------------RxDone")
-        
         self.clear_irq_flags(RxDone=1)
         payload = self.read_payload(nocheck=True)
         print("".join(format(x, '02x') for x in bytes(payload)))
@@ -33,13 +34,14 @@ class LoRaWANrcv(LoRa):
         print("mic: "+str(lorawan.get_mic()))
         print("valid mic: "+str(lorawan.valid_mic()))
 
+        #If mtype is JOIN_REQUEST
         if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
             print("Got LoRaWAN JOIN_REQUEST")
             rx_devnonce = lorawan.get_mac_payload().frm_payload.get_devnonce()
             print("devnonce: ", rx_devnonce)
             if str(rx_devnonce[0])+str(rx_devnonce[1]) in self.usedDevnonce:
                 print("Error: Received devnonce has been used already!")
-                #exit(1)
+                return
             self.usedDevnonce |= {str(rx_devnonce[0])+str(rx_devnonce[1])}
 
             lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
@@ -48,33 +50,56 @@ class LoRaWANrcv(LoRa):
             self.set_mode(MODE.STDBY)
             self.set_invert_iq(1)
             self.set_invert_iq2(1)
+            # init FCnt
+            self.FCntUp=0
+            self.FCntDown=0
             print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
             self.set_dio_mapping([1,0,0,0,0,0])
             sleep(3)
             self.set_mode(MODE.TX)
 
-        elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
+        #If mtype is uplink
+        elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
+                or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
             print("received message: "+"".join(list(map(chr, lorawan.get_payload()))))
-            
-            mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
-            self.set_mode(MODE.STDBY)
-            self.set_invert_iq(0)
-            self.set_invert_iq2(0)
-            self.reset_ptr_rx()
-            self.set_mode(MODE.RXCONT)
+            #Check FCntUp
+            if self.FCntUp == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
+                correct_fcnt = True
+                self.FCntUp += 1
+            else:
+                print("Duplicated Message?: Got wrong FCnt!")
+                correct_fcnt = False
 
-            '''
-            lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':1, 'data':list(map(ord, 'Testing TX'))})
-            self.set_invert_iq(1)
-            self.write_payload(lorawan.to_raw())
-            self.set_dio_mapping([1,0,0,0,0,0])
-            sleep(3)
-            self.set_mode(MODE.TX)
-            '''
+            #MQTT publish to sinknode
+            #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
+            #If Unconfirmed Uplink, keep listen
+            if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
+                if correct_fcnt == True:
+                    pass
+                    #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
+                elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp:
+                    self.FCntUp = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
+                mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
+                self.set_mode(MODE.STDBY)
+                self.set_invert_iq(0)
+                self.set_invert_iq2(0)
+                self.reset_ptr_rx()
+                self.set_mode(MODE.RXCONT)
+            #If Confirmed Uplink, send ACK 
+            elif lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
+                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown, 'ACK':True, 'data':list(map(ord, 'ACK'))})
+                self.set_invert_iq(1)
+                self.set_invert_iq2(1)
+                self.write_payload(lorawan.to_raw())
+                self.set_dio_mapping([1,0,0,0,0,0])
+                sleep(3)
+                self.set_mode(MODE.TX)
 
         print("--------------------------------------------\n")
     def on_tx_done(self):
+        #Update FCntDown
+        self.FCntDown += 1
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("======================================>TX_DONE!")
@@ -85,7 +110,8 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.RXCONT)
 
     def start(self):
-        self.tx_counter=0
+        self.FCntDown=0
+        self.FCntUp=0
         self.set_invert_iq(0)
         self.set_invert_iq2(0)
         self.reset_ptr_rx()
@@ -152,6 +178,7 @@ dlsettings = [0x00]
 rxdelay = [0x00]
 cflist = []
 
+appkey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC1, 0x45, 0x6E, 0xC5, 0x45]
 nwskey = [0xC3, 0x24, 0x64, 0x98, 0xDE, 0x56, 0x5D, 0x8C, 0x55, 0x88, 0x7C, 0x05, 0x86, 0xF9, 0x82, 0x26]
 appskey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC1, 0x45, 0x6E, 0xC5, 0x45]
 #nwskey = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -162,22 +189,8 @@ appskey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC
 
 mqttclient = Init_client("lora-GW-" + str(getmac.get_mac_address()))
 mqttclient.connect(args.b, args.p)
-#mqttclient.loop_start()
+mqttclient.loop_start()
 print("[MQTT] Connecting to broker ", args.b)
-try:
-    mqttclient.connect(args.b, args.p)
-except:
-    print("[MQTT] [ERROR]:Connection failed!")
-    exit(1)
-'''
-while not mqttclient.connected_flag and not mqttclient.bad_connection_flag:
-    print("[MQTT] Waiting for connection...")
-    sleep(1)
-if mqttclient.bad_connection_flag:
-    mqttclient.loop_stop()
-    sys.exit()
-'''
-
 
 lora = LoRaWANrcv(verbose=False)
 lora.set_mode(MODE.STDBY)
