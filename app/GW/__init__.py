@@ -80,7 +80,10 @@ class LoRaWANrcv(LoRa):
                     #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
                 elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp:
                     self.FCntUp = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
-                mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
+
+                rx_msg = "".join(list(map(chr, lorawan.get_payload())))
+                
+                mqttclient.publish(rx_msg.split(':')[0], rx_msg.split(':')[1])
                 self.set_mode(MODE.STDBY)
                 self.set_invert_iq(0)
                 self.set_invert_iq2(0)
