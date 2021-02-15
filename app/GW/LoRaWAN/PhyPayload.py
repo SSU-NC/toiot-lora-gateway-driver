@@ -12,6 +12,11 @@ class PhyPayload:
         self.nwkey = nwkey
         self.appkey = appkey
     
+    def set_nwkey(self, _nwkey):
+        self.nwkey = _nwkey
+    def set_appkey(self, _appkey):
+        self.appkey = _appkey
+
     def read(self, packet):
         if len(packet) < 12:
             raise MalformedPacketException("Invalid lorawan packet");
