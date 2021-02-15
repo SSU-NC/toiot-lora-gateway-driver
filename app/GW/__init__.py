@@ -20,6 +20,12 @@ class LoRaWANrcv(LoRa):
     def __init__(self, verbose = False):
         super(LoRaWANrcv, self).__init__(verbose)
         self.usedDevnonce = set()
+        self.rx_devaddr = ''
+        self.appskey_dict = {}
+        self.nwskey_dict = {}
+        self.FCntDown=0
+        self.FCntUp=0
+
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
     def on_rx_done(self):
@@ -29,6 +35,17 @@ class LoRaWANrcv(LoRa):
         payload = self.read_payload(nocheck=True)
         print("".join(format(x, '02x') for x in bytes(payload)))
         lorawan.read(payload)
+        
+        print(lorawan.get_devaddr())
+        for elem in lorawan.get_devaddr():
+            self.rx_devaddr += '{:02X}'.format(elem)
+
+        if self.rx_devaddr in self.nwskey_dict:
+            lorawan.set_nwkey(self.nwskey_dict[self.rx_devaddr])
+        if self.rx_devaddr in self.appskey_dict:
+            lorawan.set_appkey(self.appskey_dict[self.rx_devaddr])
+        
+        
         print("mhdr.mversion: "+str(format(lorawan.get_mhdr().get_mversion(), '08b')))
         print("mhdr.mtype: "+str(format(lorawan.get_mhdr().get_mtype(), '08b')))
         print("mic: "+str(lorawan.get_mic()))
@@ -39,14 +56,19 @@ class LoRaWANrcv(LoRa):
             print("Got LoRaWAN JOIN_REQUEST")
             rx_devnonce = lorawan.get_mac_payload().frm_payload.get_devnonce()
             print("devnonce: ", rx_devnonce)
+
+            # Ignore same devnonce
             if str(rx_devnonce[0])+str(rx_devnonce[1]) in self.usedDevnonce:
                 print("Error: Received devnonce has been used already!")
                 return
             self.usedDevnonce |= {str(rx_devnonce[0])+str(rx_devnonce[1])}
-
+            
+            # Create JoinAccept Message
             lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
-            print(lorawan.derive_nwskey(rx_devnonce))
-            print(lorawan.derive_appskey(rx_devnonce))
+            new_nwskey = lorawan.derive_nwskey(rx_devnonce)    # Generate new nwskey and set new nwkey
+            self.nwskey_dict[self.rx_devaddr] = new_nwskey
+            new_appskey = lorawan.derive_appskey(rx_devnonce)   # Generate new appskey and set new appkey
+            self.appskey_dict[self.rx_devaddr] = new_appskey
             self.set_mode(MODE.STDBY)
             self.set_invert_iq(1)
             self.set_invert_iq2(1)
@@ -58,6 +80,8 @@ class LoRaWANrcv(LoRa):
             self.set_dio_mapping([1,0,0,0,0,0])
             sleep(3)
             self.set_mode(MODE.TX)
+
+
 
         #If mtype is uplink
         elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
@@ -113,8 +137,12 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.RXCONT)
 
     def start(self):
+        '''
+        self.appskey_dict = {}
+        self.nwskey_dict = {}
         self.FCntDown=0
         self.FCntUp=0
+        '''
         self.set_invert_iq(0)
         self.set_invert_iq2(0)
         self.reset_ptr_rx()
@@ -202,7 +230,7 @@ lora.set_freq(433.175)
 lora.set_pa_config(pa_select=1, max_power=0x0F, output_power=0x0E)
 lora.set_spreading_factor(8)
 lora.set_sync_word(0x34)
-lorawan = LoRaWAN.new(nwskey, appskey)
+lorawan = LoRaWAN.new(nwskey, appkey)
 
 lora.set_rx_crc(True)
 print(lora)
