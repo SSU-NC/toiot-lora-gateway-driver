@@ -23,8 +23,8 @@ class LoRaWANrcv(LoRa):
         self.rx_devaddr = ''
         self.appskey_dict = {}
         self.nwskey_dict = {}
-        self.FCntDown=0
-        self.FCntUp=0
+        self.FCntDown_dict={}
+        self.FCntUp_dict={}
 
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
@@ -37,6 +37,7 @@ class LoRaWANrcv(LoRa):
         lorawan.read(payload)
         
         print(lorawan.get_devaddr())
+        self.rx_devaddr = ""
         for elem in lorawan.get_devaddr():
             self.rx_devaddr += '{:02X}'.format(elem)
 
@@ -72,9 +73,11 @@ class LoRaWANrcv(LoRa):
             self.set_mode(MODE.STDBY)
             self.set_invert_iq(1)
             self.set_invert_iq2(1)
+            
             # init FCnt
-            self.FCntUp=0
-            self.FCntDown=0
+            self.FCntUp_dict[self.rx_devaddr]=0
+            self.FCntDown_dict[self.rx_devaddr]=0
+
             print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
             self.set_dio_mapping([1,0,0,0,0,0])
@@ -86,14 +89,21 @@ class LoRaWANrcv(LoRa):
         #If mtype is uplink
         elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
                 or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-            print("received message: "+"".join(list(map(chr, lorawan.get_payload()))))
+            print("Received message: "+"".join(list(map(chr, lorawan.get_payload()))))
+            
             #Check FCntUp
-            if self.FCntUp == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
+            if self.rx_devaddr not in self.FCntUp_dict:
+                self.FCntUp_dict[self.rx_devaddr] = 0
+            print("Received Uplink FCnt: ", int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little')\
+                    ,"| Local FCntUp value",self.FCntUp_dict[self.rx_devaddr])
+
+            if self.FCntUp_dict[self.rx_devaddr] == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
                 correct_fcnt = True
-                self.FCntUp += 1
+                self.FCntUp_dict[self.rx_devaddr] += 1
             else:
                 print("Duplicated Message?: Got wrong FCnt!")
                 correct_fcnt = False
+
 
             #MQTT publish to sinknode
             #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
@@ -103,7 +113,7 @@ class LoRaWANrcv(LoRa):
                     pass
                     #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
                 elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp:
-                    self.FCntUp = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
+                    self.FCntUp_dict[self.rx_devaddr] = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
 
                 rx_msg = "".join(list(map(chr, lorawan.get_payload())))
                 
@@ -126,7 +136,9 @@ class LoRaWANrcv(LoRa):
         print("--------------------------------------------\n")
     def on_tx_done(self):
         #Update FCntDown
-        self.FCntDown += 1
+        if self.rx_devaddr not in self.FCntDown_dict:
+            self.FCntDown_dict[self.rx_devaddr] = 0
+        self.FCntDown_dict[self.rx_devaddr] += 1
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("======================================>TX_DONE!")
@@ -137,12 +149,6 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.RXCONT)
 
     def start(self):
-        '''
-        self.appskey_dict = {}
-        self.nwskey_dict = {}
-        self.FCntDown=0
-        self.FCntUp=0
-        '''
         self.set_invert_iq(0)
         self.set_invert_iq2(0)
         self.reset_ptr_rx()

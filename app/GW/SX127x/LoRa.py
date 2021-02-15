@@ -933,6 +933,7 @@ class LoRa(object):
         ocp = self.get_ocp(convert_mA=True)
         lna = self.get_lna()
         s =  "SX127x LoRa registers:\n"
+        print("get_mode: ", self.get_mode())
         s += " mode               %s\n" % MODE.lookup[self.get_mode()]
         s += " freq               %f MHz\n" % f
         s += " coding_rate        %s\n" % CODING_RATE.lookup[cfg1['coding_rate']]
