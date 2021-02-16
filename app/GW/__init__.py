@@ -20,14 +20,18 @@ class LoRaWANrcv(LoRa):
     def __init__(self, verbose = False):
         super(LoRaWANrcv, self).__init__(verbose)
         self.usedDevnonce = set()
+        self.rx_deveui = ''
         self.rx_devaddr = ''
-        self.appskey_dict = {}
-        self.nwskey_dict = {}
-        self.FCntDown=0
-        self.FCntUp=0
+        self.accepted_deveui = {}   # key:deveui | value:devaddr
+        self.appskey_dict = {}      # key:devaddr | value:appskey
+        self.nwskey_dict = {}       # key:devaddr | value:nwskey
+        self.FCntDown_dict={}
+        self.FCntUp_dict={}
 
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
+
+
     def on_rx_done(self):
         correct_fcnt = False
         print("-------------------------------------RxDone")
@@ -36,24 +40,34 @@ class LoRaWANrcv(LoRa):
         print("".join(format(x, '02x') for x in bytes(payload)))
         lorawan.read(payload)
         
-        print(lorawan.get_devaddr())
-        for elem in lorawan.get_devaddr():
-            self.rx_devaddr += '{:02X}'.format(elem)
-
-        if self.rx_devaddr in self.nwskey_dict:
-            lorawan.set_nwkey(self.nwskey_dict[self.rx_devaddr])
-        if self.rx_devaddr in self.appskey_dict:
-            lorawan.set_appkey(self.appskey_dict[self.rx_devaddr])
-        
+        # If mtype is UPLink, get devaddr
+        if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
+            self.rx_devaddr = ''
+            rx_devaddr_list = lorawan.get_mac_payload().get_fhdr().get_devaddr()
+            for elem in rx_devaddr_list:
+                self.rx_devaddr += '{:02X}'.format(elem)
+            print("rx_devaddr: ",self.rx_devaddr)
+            if self.rx_devaddr in self.nwskey_dict:
+                lorawan.set_nwkey(self.nwskey_dict[self.rx_devaddr])
+            if self.rx_devaddr in self.appskey_dict:
+                lorawan.set_appkey(self.appskey_dict[self.rx_devaddr])
+        # else If mtype is JOIN_REQUEST, get deveui
+        elif lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
+            for elem in lorawan.get_mac_payload().frm_payload.get_deveui():
+                self.rx_deveui += '{:02X}'.format(elem)
+            print("rx_deveui: ", self.rx_deveui)
         
         print("mhdr.mversion: "+str(format(lorawan.get_mhdr().get_mversion(), '08b')))
         print("mhdr.mtype: "+str(format(lorawan.get_mhdr().get_mtype(), '08b')))
         print("mic: "+str(lorawan.get_mic()))
         print("valid mic: "+str(lorawan.valid_mic()))
 
-        #If mtype is JOIN_REQUEST
+
+        #If mtype is JOIN_REQUEST--------------------------------------------------
         if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
             print("Got LoRaWAN JOIN_REQUEST")
+            lorawan.set_appkey(appkey)
+            lorawan.set_nwkey(nwskey)
             rx_devnonce = lorawan.get_mac_payload().frm_payload.get_devnonce()
             print("devnonce: ", rx_devnonce)
 
@@ -62,19 +76,39 @@ class LoRaWANrcv(LoRa):
                 print("Error: Received devnonce has been used already!")
                 return
             self.usedDevnonce |= {str(rx_devnonce[0])+str(rx_devnonce[1])}
-            
+
+
             # Create JoinAccept Message
-            lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
+            new_devaddr = [0x86,randrange(256),randrange(256),randrange(256)]
+            new_devaddr_str = ""
+            for elem in new_devaddr:
+                new_devaddr_str +='{:02X}'.format(elem)
+                
+            # Create new devaddr for node
+            if self.rx_deveui in self.accepted_deveui:
+                while self.accepted_deveui[self.rx_deveui] != new_devaddr_str:
+                    new_devaddr = [0x86,randrange(256),randrange(256),randrange(256)]
+                    new_devaddr_str=""
+                    for elem in new_devaddr:
+                        new_devaddr_str +='{:02X}'.format(elem)
+                self.accepted_deveui[self.rx_deveui] = new_devaddr_str
+
+            lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':new_devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
+            
+                    
+
             new_nwskey = lorawan.derive_nwskey(rx_devnonce)    # Generate new nwskey and set new nwkey
-            self.nwskey_dict[self.rx_devaddr] = new_nwskey
+            self.nwskey_dict[new_devaddr_str] = new_nwskey
             new_appskey = lorawan.derive_appskey(rx_devnonce)   # Generate new appskey and set new appkey
-            self.appskey_dict[self.rx_devaddr] = new_appskey
+            self.appskey_dict[new_devaddr_str] = new_appskey
             self.set_mode(MODE.STDBY)
             self.set_invert_iq(1)
             self.set_invert_iq2(1)
+            
             # init FCnt
-            self.FCntUp=0
-            self.FCntDown=0
+            self.FCntUp_dict[new_devaddr_str]=0
+            self.FCntDown_dict[new_devaddr_str]=0
+
             print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
             self.set_dio_mapping([1,0,0,0,0,0])
@@ -83,27 +117,33 @@ class LoRaWANrcv(LoRa):
 
 
 
-        #If mtype is uplink
+        #If mtype is UPLink---------------------------------------------------------
         elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
                 or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-            print("received message: "+"".join(list(map(chr, lorawan.get_payload()))))
+            print("Received message: "+"".join(list(map(chr, lorawan.get_payload()))))
+            
             #Check FCntUp
-            if self.FCntUp == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
+            if self.rx_devaddr not in self.FCntUp_dict:
+                self.FCntUp_dict[self.rx_devaddr] = 0
+            print("Received Uplink FCnt: ", int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little')\
+                    ,"| Local FCntUp value",self.FCntUp_dict[self.rx_devaddr])
+
+            if self.FCntUp_dict[self.rx_devaddr] == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
                 correct_fcnt = True
-                self.FCntUp += 1
+                self.FCntUp_dict[self.rx_devaddr] += 1
             else:
                 print("Duplicated Message?: Got wrong FCnt!")
                 correct_fcnt = False
 
+
             #MQTT publish to sinknode
-            #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
             #If Unconfirmed Uplink, keep listen
             if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
                 if correct_fcnt == True:
                     pass
                     #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
-                elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp:
-                    self.FCntUp = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
+                elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp_dict[self.rx_devaddr]:
+                    self.FCntUp_dict[self.rx_devaddr] = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
 
                 rx_msg = "".join(list(map(chr, lorawan.get_payload())))
                 
@@ -115,18 +155,22 @@ class LoRaWANrcv(LoRa):
                 self.set_mode(MODE.RXCONT)
             #If Confirmed Uplink, send ACK 
             elif lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown, 'ACK':True, 'data':list(map(ord, 'ACK'))})
+                if self.rx_devaddr in self.FCntDown_dict:
+                    self.FCntDown_dict[self.rx_devaddr]
+                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown_dict[self.rx_devaddr], 'ACK':True, 'data':list(map(ord, 'ACK'))})
                 self.set_invert_iq(1)
                 self.set_invert_iq2(1)
                 self.write_payload(lorawan.to_raw())
                 self.set_dio_mapping([1,0,0,0,0,0])
-                sleep(3)
+                sleep(0.1)
                 self.set_mode(MODE.TX)
 
         print("--------------------------------------------\n")
     def on_tx_done(self):
         #Update FCntDown
-        self.FCntDown += 1
+        if self.rx_devaddr not in self.FCntDown_dict:
+            self.FCntDown_dict[self.rx_devaddr] = 0
+        self.FCntDown_dict[self.rx_devaddr] += 1
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("======================================>TX_DONE!")
@@ -137,12 +181,6 @@ class LoRaWANrcv(LoRa):
         self.set_mode(MODE.RXCONT)
 
     def start(self):
-        '''
-        self.appskey_dict = {}
-        self.nwskey_dict = {}
-        self.FCntDown=0
-        self.FCntUp=0
-        '''
         self.set_invert_iq(0)
         self.set_invert_iq2(0)
         self.reset_ptr_rx()
@@ -204,7 +242,7 @@ def on_disconnect(client, userdata, rc):
 # Init
 appnonce = [randrange(256), randrange(256), randrange(256)]
 netid = [0x00,0x00,0x01] #Type=0, NetID=1
-devaddr = [0x26, 0x01, 0x11, 0x5F]
+#devaddr = [0x26, 0x01, 0x11, 0x5F]
 dlsettings = [0x00]
 rxdelay = [0x00]
 cflist = []
