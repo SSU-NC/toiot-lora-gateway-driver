@@ -12,6 +12,11 @@ class PhyPayload:
         self.nwkey = nwkey
         self.appkey = appkey
     
+    def set_nwkey(self, _nwkey):
+        self.nwkey = _nwkey
+    def set_appkey(self, _appkey):
+        self.appkey = _appkey
+
     def read(self, packet):
         if len(packet) < 12:
             raise MalformedPacketException("Invalid lorawan packet");
@@ -97,3 +102,11 @@ class PhyPayload:
     def derive_appskey(self, devnonce):
         self.appkey = self.mac_payload.frm_payload.derive_appskey(self.appkey, devnonce)
         return self.appkey
+
+    def get_deveui(self):
+        if self.get_mhdr().get_mtype == MHDR.JOIN_REQUEST:
+            return self.mac_payload.frm_payload.get_deveui()
+
+    def get_appeui(self):
+        if self.get_mhdr().get_mtype == MHDR.JOIN_REQUEST:
+            return self.mac_payload.frm_payload.get_appeui()
