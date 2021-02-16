@@ -10,7 +10,6 @@ class FHDR:
     def read(self, mac_payload):
         if len(mac_payload) < 7:
             raise MalformedPacketException("Invalid fhdr")
-
         self.devaddr = mac_payload[:4]
         self.fctrl = mac_payload[4]
         self.fcnt = mac_payload[5:7]
@@ -43,6 +42,12 @@ class FHDR:
         if self.fopts:
             fhdr += self.fopts
         return fhdr
+
+    def get_appeui(self):
+        return self.appeui
+
+    def get_deveui(self):
+        return self.deveui
 
     def get_devaddr(self):
         return self.devaddr

@@ -102,3 +102,11 @@ class PhyPayload:
     def derive_appskey(self, devnonce):
         self.appkey = self.mac_payload.frm_payload.derive_appskey(self.appkey, devnonce)
         return self.appkey
+
+    def get_deveui(self):
+        if self.get_mhdr().get_mtype == MHDR.JOIN_REQUEST:
+            return self.mac_payload.frm_payload.get_deveui()
+
+    def get_appeui(self):
+        if self.get_mhdr().get_mtype == MHDR.JOIN_REQUEST:
+            return self.mac_payload.frm_payload.get_appeui()
