@@ -26,13 +26,20 @@ class MacPayload:
             self.frm_payload.read(mac_payload)
         elif mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.UNCONF_DATA_DOWN or\
                 mtype == MHDR.CONF_DATA_UP or mtype == MHDR.CONF_DATA_DOWN:
-            self.frm_payload = DataPayload()
+            if self.fport!=0:
+                self.frm_payload = DataPayload()
+            elif self.fport==0:
+                self.frm_payload = MacCommandPayload()
             self.frm_payload.read(self, mac_payload[self.fhdr.length() + 1:])
 
     def create(self, mhdr, mtype, key, args):
         self.fhdr = FHDR()
         self.fhdr.create(mtype, args)
-        self.fport = 0x01
+        if 'fport' in args:
+            self.fport = args['fport']
+        else:
+            self.fport = 0x01
+
         self.frm_payload = None
         if mtype == MHDR.JOIN_REQUEST:
             self.frm_payload = JoinRequestPayload()
