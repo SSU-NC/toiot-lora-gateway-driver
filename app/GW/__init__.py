@@ -12,6 +12,7 @@ from .setup import args
 import GW.LoRaWAN
 from .LoRaWAN.MHDR import MHDR
 from .LoRaWAN.LoRaMAC import LoRaMAC
+from .LoRaWAN.Channel import Channel
 
 BOARD.setup()
 parser = LoRaArgumentParser("LoRaWAN receiver")
@@ -30,8 +31,8 @@ class LoRaWANrcv(LoRa):
 
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
-
-
+    
+    
     def on_rx_done(self):
         correct_fcnt = False
         print("-------------------------------------RxDone")
@@ -112,7 +113,7 @@ class LoRaWANrcv(LoRa):
             print("write:", self.write_payload(lorawan.to_raw()))
             print("packet: ", lorawan.to_raw())
             self.set_dio_mapping([1,0,0,0,0,0])
-            sleep(3)
+            sleep(0.1)
             self.set_mode(MODE.TX)
 
 
@@ -264,7 +265,7 @@ print("[MQTT] Connecting to broker ", args.b)
 lora = LoRaWANrcv(verbose=False)
 lora.set_mode(MODE.STDBY)
 lora.set_dio_mapping([0] * 6)
-lora.set_freq(433.175)
+lora.set_freq(Channel.get_freq('EU433', 0)) # Set freq: EU433 channel 0
 lora.set_pa_config(pa_select=1, max_power=0x0F, output_power=0x0E)
 lora.set_spreading_factor(8)
 lora.set_sync_word(0x34)
