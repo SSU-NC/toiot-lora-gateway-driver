@@ -20,7 +20,7 @@ class FHDR:
         self.fctrl = 0x00
         if 'ACK' in args:
             if args['ACK'] == True:
-                self.fctrl = self.fctrl & 0x20 # 0010 0000 : ACK=1, FOptsLen=0
+                self.fctrl = self.fctrl | 0x20 # 0010 0000 : ACK=1, FOptsLen=0
 
         if 'fcnt' in args:
             self.fcnt = args['fcnt'].to_bytes(2, byteorder='little')
@@ -29,7 +29,8 @@ class FHDR:
         self.fopts = []
         if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.UNCONF_DATA_DOWN or\
                 mtype == MHDR.CONF_DATA_UP or mtype == MHDR.CONF_DATA_DOWN:
-            self.devaddr = list(reversed(args['devaddr']))
+            #self.devaddr = list(reversed(args['devaddr']))
+            self.devaddr = list(args['devaddr'])
 
     def length(self):
         return 4 + 1 + 2 + (self.fctrl & 0xf)

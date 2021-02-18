@@ -23,50 +23,65 @@ class LoRaWANrcv(LoRa):
         self.usedDevnonce = set()
         self.rx_deveui = ''
         self.rx_devaddr = ''
-        self.accepted_deveui = {}   # key:deveui | value:devaddr
+        self.accepted_deveui = {}   # key:deveui  | value:devaddr
         self.appskey_dict = {}      # key:devaddr | value:appskey
         self.nwskey_dict = {}       # key:devaddr | value:nwskey
         self.FCntDown_dict={}
         self.FCntUp_dict={}
 
+        # Convert devaddr to node id
+        self.devaddr2nodeid = {}    # key:devaddr | value:nodeid
+        
         self.set_mode(MODE.SLEEP)
         self.reset_ptr_rx()
-    
-    
+        
+        # values for mac commands
+        self.is_MacCommand = False
+        self.commandType = None
+        self.AnsCommand_payload = []
     def on_rx_done(self):
+        # Initialize values
+        self.is_MacCommand = False
         correct_fcnt = False
+
         print("-------------------------------------RxDone")
         self.clear_irq_flags(RxDone=1)
         payload = self.read_payload(nocheck=True)
         print("".join(format(x, '02x') for x in bytes(payload)))
         lorawan.read(payload)
         
-        # If mtype is UPLink, get devaddr
-        if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-            self.rx_devaddr = ''
-            rx_devaddr_list = lorawan.get_mac_payload().get_fhdr().get_devaddr()
-            for elem in rx_devaddr_list:
-                self.rx_devaddr += '{:02X}'.format(elem)
-            print("rx_devaddr: ",self.rx_devaddr)
-            if self.rx_devaddr in self.nwskey_dict:
-                lorawan.set_nwkey(self.nwskey_dict[self.rx_devaddr])
-            if self.rx_devaddr in self.appskey_dict:
-                lorawan.set_appkey(self.appskey_dict[self.rx_devaddr])
-        # else If mtype is JOIN_REQUEST, get deveui
-        elif lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
-            for elem in lorawan.get_mac_payload().frm_payload.get_deveui():
-                self.rx_deveui += '{:02X}'.format(elem)
-            print("rx_deveui: ", self.rx_deveui)
         
         print("mhdr.mversion: "+str(format(lorawan.get_mhdr().get_mversion(), '08b')))
         print("mhdr.mtype: "+str(format(lorawan.get_mhdr().get_mtype(), '08b')))
         print("mic: "+str(lorawan.get_mic()))
         print("valid mic: "+str(lorawan.valid_mic()))
 
+        # If mtype is UPLink-----------------------------------------------------
+        if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
+            self.rx_devaddr = ''
+            # Get devaddr and add it to devaddr_list
+            rx_devaddr_list = lorawan.get_mac_payload().get_fhdr().get_devaddr()
+            for elem in rx_devaddr_list:
+                self.rx_devaddr += '{:02X}'.format(elem)
+            print("rx_devaddr: ",self.rx_devaddr)
+            # Update keys
+            if self.rx_devaddr in self.nwskey_dict:
+                lorawan.set_nwkey(self.nwskey_dict[self.rx_devaddr])
+            if self.rx_devaddr in self.appskey_dict:
+                lorawan.set_appkey(self.appskey_dict[self.rx_devaddr])
+            # Update is_MacCommand
+            self.is_MacCommand = not lorawan.get_mac_payload().get_fport() # Boolean reversal
+            print("is_MacCommand: ", self.is_MacCommand)
 
         #If mtype is JOIN_REQUEST--------------------------------------------------
-        if lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
+        elif lorawan.get_mhdr().get_mtype() == MHDR.JOIN_REQUEST:
             print("Got LoRaWAN JOIN_REQUEST")
+            
+            # Get deveui and give new devaddr to end-device
+            for elem in lorawan.get_mac_payload().frm_payload.get_deveui():
+                self.rx_deveui += '{:02X}'.format(elem)
+            print("rx_deveui: ", self.rx_deveui)
+
             lorawan.set_appkey(appkey)
             lorawan.set_nwkey(nwskey)
             rx_devnonce = lorawan.get_mac_payload().frm_payload.get_devnonce()
@@ -95,8 +110,6 @@ class LoRaWANrcv(LoRa):
                 self.accepted_deveui[self.rx_deveui] = new_devaddr_str
 
             lorawan.create(MHDR.JOIN_ACCEPT, {'appnonce':appnonce, 'netid':netid, 'devaddr':new_devaddr, 'dlsettings':dlsettings, 'rxdelay':rxdelay, 'cflist':cflist})
-            
-                    
 
             new_nwskey = lorawan.derive_nwskey(rx_devnonce)    # Generate new nwskey and set new nwkey
             self.nwskey_dict[new_devaddr_str] = new_nwskey
@@ -119,16 +132,19 @@ class LoRaWANrcv(LoRa):
 
 
         #If mtype is UPLink---------------------------------------------------------
-        elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
+        if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
                 or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-            print("Received message: "+"".join(list(map(chr, lorawan.get_payload()))))
-            
-            #Check FCntUp
+            rx_msg = "".join(list(map(chr, lorawan.get_payload()))) # Make message into list
+            print("Received message: "+rx_msg)
+            #Check FCntUp, If not exist in FCntUp_dict, set FCntUp to 0
             if self.rx_devaddr not in self.FCntUp_dict:
                 self.FCntUp_dict[self.rx_devaddr] = 0
+            
+            if self.is_MacCommand == False:                          # If FRMPayload is not MacCommand, update devaddr2nodeid.
+                self.devaddr2nodeid[self.rx_devaddr] = int(rx_msg.split(':')[0].split('/')[1]) # Matching devaddr - nodeid(int)
+            
             print("Received Uplink FCnt: ", int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little')\
                     ,"| Local FCntUp value",self.FCntUp_dict[self.rx_devaddr])
-
             if self.FCntUp_dict[self.rx_devaddr] == int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little'):
                 correct_fcnt = True
                 self.FCntUp_dict[self.rx_devaddr] += 1
@@ -137,28 +153,49 @@ class LoRaWANrcv(LoRa):
                 correct_fcnt = False
 
 
-            #MQTT publish to sinknode
-            #If Unconfirmed Uplink, keep listen
-            if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
-                if correct_fcnt == True:
+            #If fcnt is correct
+            if correct_fcnt == True:
                     pass
-                    #mqttclient.publish("".join(list(map(chr, lorawan.get_payload()))))
-                elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') > self.FCntUp_dict[self.rx_devaddr]:
-                    self.FCntUp_dict[self.rx_devaddr] = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
+            elif int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), \
+                     byteorder='little') > self.FCntUp_dict[self.rx_devaddr]:
+                self.FCntUp_dict[self.rx_devaddr] = int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little') + 1
 
-                rx_msg = "".join(list(map(chr, lorawan.get_payload())))
-                
-                mqttclient.publish(rx_msg.split(':')[0], rx_msg.split(':')[1])
-                self.set_mode(MODE.STDBY)
-                self.set_invert_iq(0)
-                self.set_invert_iq2(0)
-                self.reset_ptr_rx()
-                self.set_mode(MODE.RXCONT)
-            #If Confirmed Uplink, send ACK 
+            
+            # If MacCommand is in FramePayload, handle this MacCommand
+            if self.is_MacCommand == True:
+                if self.rx_devaddr in self.devaddr2nodeid:      # Important!: Can't handle MacCommand if nodeid was not received before.
+                    self.commandType, self.AnsCommand_payload = CID.handle_command_payload(lorawan, self.devaddr2nodeid[self.rx_devaddr], int(rx_msg), mqttclient)
+            else:
+                # If not MacCommand, MQTT Publish
+                mqttclient.publish(rx_msg.split(':')[0], rx_msg.split(':')[1]) # topic: 'data/nodeid', message: 'sensorid,value'
+
+
+
+            #If Unconfirmed Uplink, respond to MacCommand or just keep listen
+            if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
+                if self.is_MacCommand==True and self.commandType == CID.Req: # If received Mac Command is Request, send Ans
+                    # Update FCntDown
+                    if self.rx_devaddr not in self.FCntDown_dict:
+                        self.FCntDown_dict[self.rx_devaddr] = 0
+                    lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
+                            'fcnt':self.FCntDown_dict[self.rx_devaddr],\
+                            'fport':0,'data':self.AnsCommand_payload})
+                else: # If received Mac Command is Answer, keep listen
+                    self.set_mode(MODE.STDBY)
+                    self.set_invert_iq(0)
+                    self.set_invert_iq2(0)
+                    self.reset_ptr_rx()
+                    self.set_mode(MODE.RXCONT)
+            
+            #If Confirmed Uplink, send ACK (+ do MacCommand)
             elif lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
-                if self.rx_devaddr in self.FCntDown_dict:
-                    self.FCntDown_dict[self.rx_devaddr]
-                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown_dict[self.rx_devaddr], 'ACK':True, 'data':list(map(ord, 'ACK'))})
+                if self.rx_devaddr not in self.FCntDown_dict:
+                    self.FCntDown_dict[self.rx_devaddr] = 0
+                print('devaddr_list: ', rx_devaddr_list)
+                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
+                            'fcnt':self.FCntDown_dict[self.rx_devaddr], \
+                            'ACK':True, 'data':list(map(ord, 'ACK'))})
+                
                 self.set_invert_iq(1)
                 self.set_invert_iq2(1)
                 self.write_payload(lorawan.to_raw())
@@ -168,10 +205,12 @@ class LoRaWANrcv(LoRa):
 
         print("--------------------------------------------\n")
     def on_tx_done(self):
-        #Update FCntDown
+        # Update FCntDown
         if self.rx_devaddr not in self.FCntDown_dict:
             self.FCntDown_dict[self.rx_devaddr] = 0
         self.FCntDown_dict[self.rx_devaddr] += 1
+        
+        # Set mode to RX
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
         print("======================================>TX_DONE!")

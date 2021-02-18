@@ -44,7 +44,11 @@ class CID:
     DeviceModeInd       = 0x20
     DeviceModeConf      = 0x20
 
-    def create_cid_payload(args):
+    # define command type
+    Req = 0x00
+    Ans = 0x01
+
+    def create_command_payload(args):
         payload = []
         # Sinknode(Network server) should respond with LinkCheckAns
         if args['cid'] == CID.LinkCheckAns:              
@@ -61,9 +65,6 @@ class CID:
         elif args['cid'] == CID.RXParamSetupReq:
             payload+=args['dlsettings']         # 1 Octet (7bit RFU | [6:4]bits RX1DROffset | [3:0]bits RX2DataRate)
             payload+=args['frequency']          # 3 Octets
-        elif args['cid'] == CID.DevStatusReq:
-            payload+=args['battery']            # 1 Octet
-            payload+=args['margin']             # 1 Octet
         elif args['cid'] == CID.NewChannelReq:
             payload+=args['chindex']            # 1 Octet
             payload+=args['freq']               # 3 Octets
@@ -72,11 +73,11 @@ class CID:
             payload+=args['settings']           # 1 Octet ([7:4]bits RFU | [3:0]bits Del(=Delay id))
         elif args['cid'] == CID.TXParamSetupReq:
             payload+=args['eirp_dwelltime']     # 1 Octet ([7:6]bits RFU | 5bit DownlinkDwellTime | 4bit Uplink" | [3:0]MaxEIRP)
-            # CodedValue(0~1) : DwellTime
+            # key => CodedValue(0~1)  |  value => DwellTime
             # 0:NoLimit, 1:400 ms
             # CodedValue(0~15) : MaxEIRP(dBm)
             # 0:8, 1:10, 2:12, 3:13, 4:14, 5:16, 6:18, 7:20, 8:21, 9:24, 10:26, 11:27, 12:29, 13:30, 14:33, 15:36
-        elif args['cid'] == CID.DIChannelReq:
+        elif args['cid'] == CID.DLChannelReq:
             payload+=args['chindex']            # 1 Octet
             payload+=args['freq']               # 3 Octets
 
@@ -85,5 +86,36 @@ class CID:
             payload+=args['seconds_since_epoch']    # 4 Octets (32bit unsigned int)
             payload+=args['fractional_second']      # 1 Octet (8bit unsigned int | second in (1/2)^8 sec steps)
 
+
         return payload
 
+    def handle_command_payload(lorawan, nodeid, payload, mqttclient): # received mac command payload(received Frame Payload)
+        cid = payload[0]
+        if cid == CID.LinkCheckReq:
+            margin = 0x00
+            # GET request to Flask Server
+            # Should not wait long
+            GWCnt = 0x00
+            ans_payload = create_command_payload({'cid':CID.LinkCheckAns, 'margin': margin, 'gwcnt':GWCnt})        
+            return CID.Req, ans_payload
+        elif cid == CID.DutyCycleAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.RXParamSetupAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.DevStatusAns:
+            battery = payload[1]
+            radio_status = payload[2]
+            status_dict = {'nodeid':nodeid, 'battery':battery, 'radio_status':radio_status} # Need end-device's id in this data
+            mqttclient.publish('DevStatusAns/' + str(nodeid), json.dumps(status_dict))
+            return CID.Ans, ans_payload
+        elif cid == CID.NewChannelAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.RXTimingSetupAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.TXParamSetupAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.DLChannelAns:
+            return CID.Ans, ans_payload
+        elif cid == CID.DeviceTimeReq:
+            ans_payload += [CID.DeviceTimeReq]
+            return CID.Req, ans_payload
