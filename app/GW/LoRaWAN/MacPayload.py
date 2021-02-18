@@ -7,6 +7,7 @@ from .MHDR import MHDR
 from .JoinRequestPayload import JoinRequestPayload
 from .JoinAcceptPayload import JoinAcceptPayload
 from .DataPayload import DataPayload
+from .MacCommandPayload import MacCommandPayload
 
 class MacPayload:
 

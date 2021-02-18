@@ -4,7 +4,7 @@
 from .AES_CMAC import AES_CMAC
 from .MHDR import MHDR
 from Crypto.Cipher import AES
-import .CID import CID
+from .CID import CID
 import math
 
 class MacCommandPayload:
