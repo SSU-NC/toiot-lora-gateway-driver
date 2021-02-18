@@ -132,7 +132,7 @@ class LoRaWANrcv(LoRa):
 
 
         #If mtype is UPLink---------------------------------------------------------
-        elif lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
+        if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP\
                 or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
             rx_msg = "".join(list(map(chr, lorawan.get_payload()))) # Make message into list
             print("Received message: "+rx_msg)
@@ -177,8 +177,9 @@ class LoRaWANrcv(LoRa):
                     # Update FCntDown
                     if self.rx_devaddr not in self.FCntDown_dict:
                         self.FCntDown_dict[self.rx_devaddr] = 0
-                    lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown_dict[self.rx_devaddr],\
-                        'fport':0,'data':self.AnsCommand_payload})
+                    lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
+                            'fcnt':self.FCntDown_dict[self.rx_devaddr],\
+                            'fport':0,'data':self.AnsCommand_payload})
                 else: # If received Mac Command is Answer, keep listen
                     self.set_mode(MODE.STDBY)
                     self.set_invert_iq(0)
@@ -190,7 +191,10 @@ class LoRaWANrcv(LoRa):
             elif lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
                 if self.rx_devaddr not in self.FCntDown_dict:
                     self.FCntDown_dict[self.rx_devaddr] = 0
-                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':devaddr, 'fcnt':self.FCntDown_dict[self.rx_devaddr], 'ACK':True, 'data':list(map(ord, 'ACK'))})
+                print('devaddr_list: ', rx_devaddr_list)
+                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
+                            'fcnt':self.FCntDown_dict[self.rx_devaddr], \
+                            'ACK':True, 'data':list(map(ord, 'ACK'))})
                 
                 self.set_invert_iq(1)
                 self.set_invert_iq2(1)
