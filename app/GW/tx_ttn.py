@@ -6,7 +6,7 @@ from SX127x.LoRaArgumentParser import LoRaArgumentParser
 from SX127x.board_config import BOARD
 import LoRaWAN
 from LoRaWAN.MHDR import MHDR
-
+from LoRaWAN.CID import CID
 BOARD.setup()
 parser = LoRaArgumentParser("LoRaWAN sender")
 
@@ -23,7 +23,7 @@ class LoRaWANsend(LoRa):
         print("TxDone")
         self.set_invert_iq(1)
         self.set_invert_iq2(1)
-        self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
+        self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fport': 0, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
         sleep(1)
@@ -33,7 +33,7 @@ class LoRaWANsend(LoRa):
         self.lorawan = LoRaWAN.new(nwskey, appskey)
         self.set_invert_iq(1)
         self.set_invert_iq2(1)
-        self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'fcnt': 1, 'data': list(map(ord, 'Python rules!')) })
+        self.lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr': devaddr, 'cid':CID.DevStatusReq,'fcnt': 1, 'data': list(map(ord, '')) })
         self.write_payload(self.lorawan.to_raw())
         self.set_mode(MODE.TX)
         while True:

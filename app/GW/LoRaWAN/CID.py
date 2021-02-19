@@ -50,6 +50,7 @@ class CID:
 
     def create_command_payload(args):
         payload = []
+        payload += [args['cid']]
         # Sinknode(Network server) should respond with LinkCheckAns
         if args['cid'] == CID.LinkCheckAns:              
             payload+=args['margin']

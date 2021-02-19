@@ -50,7 +50,11 @@ class MacPayload:
             self.frm_payload.create(key, mhdr, args)
         if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.UNCONF_DATA_DOWN or\
                 mtype == MHDR.CONF_DATA_UP or mtype == MHDR.CONF_DATA_DOWN:
-            self.frm_payload = DataPayload()
+            if self.fport == 0x00:
+                self.frm_payload = MacCommandPayload()
+            else:
+                self.frm_payload = DataPayload()
+            
             self.frm_payload.create(self, mtype, key, args)
 
     def length(self):

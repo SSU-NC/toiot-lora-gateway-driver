@@ -13,6 +13,7 @@ import GW.LoRaWAN
 from .LoRaWAN.MHDR import MHDR
 from .LoRaWAN.LoRaMAC import LoRaMAC
 from .LoRaWAN.Channel import Channel
+from .LoRaWAN.CID     import CID
 
 BOARD.setup()
 parser = LoRaArgumentParser("LoRaWAN receiver")
@@ -55,9 +56,11 @@ class LoRaWANrcv(LoRa):
         print("mhdr.mtype: "+str(format(lorawan.get_mhdr().get_mtype(), '08b')))
         print("mic: "+str(lorawan.get_mic()))
         print("valid mic: "+str(lorawan.valid_mic()))
-
+        print("pkt_snr_value: ", self.get_pkt_snr_value())
         # If mtype is UPLink-----------------------------------------------------
         if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
+            if lorawan.valid_mic() == False:
+                return
             self.rx_devaddr = ''
             # Get devaddr and add it to devaddr_list
             rx_devaddr_list = lorawan.get_mac_payload().get_fhdr().get_devaddr()
@@ -136,7 +139,7 @@ class LoRaWANrcv(LoRa):
                 or lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
             rx_msg = "".join(list(map(chr, lorawan.get_payload()))) # Make message into list
             print("Received message: "+rx_msg)
-            #Check FCntUp, If not exist in FCntUp_dict, set FCntUp to 0
+            # Check FCntUp, If not exist in FCntUp_dict, set FCntUp to 0
             if self.rx_devaddr not in self.FCntUp_dict:
                 self.FCntUp_dict[self.rx_devaddr] = 0
             
@@ -171,7 +174,7 @@ class LoRaWANrcv(LoRa):
 
 
 
-            #If Unconfirmed Uplink, respond to MacCommand or just keep listen
+            # If Unconfirmed Uplink, respond to MacCommand or just keep listen
             if lorawan.get_mhdr().get_mtype() == MHDR.UNCONF_DATA_UP:
                 if self.is_MacCommand==True and self.commandType == CID.Req: # If received Mac Command is Request, send Ans
                     # Update FCntDown
@@ -187,15 +190,22 @@ class LoRaWANrcv(LoRa):
                     self.reset_ptr_rx()
                     self.set_mode(MODE.RXCONT)
             
-            #If Confirmed Uplink, send ACK (+ do MacCommand)
+            # If Confirmed Uplink, send ACK (+ do MacCommand)
             elif lorawan.get_mhdr().get_mtype() == MHDR.CONF_DATA_UP:
                 if self.rx_devaddr not in self.FCntDown_dict:
                     self.FCntDown_dict[self.rx_devaddr] = 0
                 print('devaddr_list: ', rx_devaddr_list)
+                '''
                 lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
                             'fcnt':self.FCntDown_dict[self.rx_devaddr], \
                             'ACK':True, 'data':list(map(ord, 'ACK'))})
-                
+                '''
+                lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
+                            'fcnt':self.FCntDown_dict[self.rx_devaddr], \
+                            'cid':CID.DevStatusReq,\
+                            'fport':0,\
+                            'ACK':True})
+
                 self.set_invert_iq(1)
                 self.set_invert_iq2(1)
                 self.write_payload(lorawan.to_raw())
@@ -253,6 +263,8 @@ def on_message(client, userdata, message):
             "| topic: ",message.topic," | retained: ",message.retain)
     if message.retain == 1:
         print("[MQTT] This is a retained message..")
+
+
 
 def on_publish(client, userdata, result):
     print("[MQTT] Data Published via MQTT..")

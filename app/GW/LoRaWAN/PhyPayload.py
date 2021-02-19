@@ -32,7 +32,13 @@ class PhyPayload:
         self.mhdr = MHDR(mhdr)
         self.set_direction()
         self.mac_payload = MacPayload()
-        self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
+        if 'fport' in args:
+            if args['fport'] == 0:
+                self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.nwkey, args)
+            else:
+                self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
+        else:
+            self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
         self.mic = None
 
     def length(self):

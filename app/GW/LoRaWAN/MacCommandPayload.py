@@ -17,9 +17,9 @@ class MacCommandPayload:
         self.mac_payload = mac_payload
         
         if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.CONF_DATA_UP:      #uplink
-            self.set_payload(key, 0x00, args['cid'], CID.create_cid_payload(args))
+            self.set_payload(key, 0x00, CID.create_command_payload(args))
         elif mtype == MHDR.UNCONF_DATA_DOWN or mtype == MHDR.CONF_DATA_DOWN:  #downlink
-            self.set_payload(key, 0x01, args['cid'], CID.create_cid_payload(args))
+            self.set_payload(key, 0x01, CID.create_command_payload(args))
 
     def length(self):
         return len(self.payload)
@@ -27,8 +27,8 @@ class MacCommandPayload:
     def to_raw(self):
         return self.payload
 
-    def set_payload(self, key, direction, cid, cid_payload):
-        self.payload = self.encrypt_payload(key, direction, cid, cid_payload)
+    def set_payload(self, key, direction, cid_payload):
+        self.payload = self.encrypt_payload(key, direction, cid_payload)
 
     def compute_mic(self, key, direction, mhdr):
         mic = [0x49]
