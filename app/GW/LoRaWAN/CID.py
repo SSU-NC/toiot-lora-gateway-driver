@@ -1,3 +1,4 @@
+import json
 
 class CID:
     # Class-A
@@ -50,6 +51,7 @@ class CID:
 
     def create_command_payload(args):
         payload = []
+        payload += [args['cid']]
         # Sinknode(Network server) should respond with LinkCheckAns
         if args['cid'] == CID.LinkCheckAns:              
             payload+=args['margin']
@@ -91,6 +93,7 @@ class CID:
 
     def handle_command_payload(lorawan, nodeid, payload, mqttclient): # received mac command payload(received Frame Payload)
         cid = payload[0]
+        ans_payload = []
         if cid == CID.LinkCheckReq:
             margin = 0x00
             # GET request to Flask Server
@@ -103,10 +106,12 @@ class CID:
         elif cid == CID.RXParamSetupAns:
             return CID.Ans, ans_payload
         elif cid == CID.DevStatusAns:
+            print('[MacCommand]: Received DevStatusAns...')
             battery = payload[1]
             radio_status = payload[2]
             status_dict = {'nodeid':nodeid, 'battery':battery, 'radio_status':radio_status} # Need end-device's id in this data
             mqttclient.publish('DevStatusAns/' + str(nodeid), json.dumps(status_dict))
+            print('[MQTT]: ',status_dict," Published via MQTT...")
             return CID.Ans, ans_payload
         elif cid == CID.NewChannelAns:
             return CID.Ans, ans_payload
