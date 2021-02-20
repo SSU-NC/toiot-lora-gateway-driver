@@ -32,7 +32,13 @@ class PhyPayload:
         self.mhdr = MHDR(mhdr)
         self.set_direction()
         self.mac_payload = MacPayload()
-        self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
+        if 'fport' in args:
+            if args['fport'] == 0x00:
+                self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.nwkey, args)
+            else:
+                self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
+        else:
+            self.mac_payload.create(self.mhdr, self.get_mhdr().get_mtype(), self.appkey, args)
         self.mic = None
 
     def length(self):
@@ -93,7 +99,10 @@ class PhyPayload:
             return self.mac_payload.fhdr.get_devaddr()
 
     def get_payload(self):
-        return self.mac_payload.frm_payload.decrypt_payload(self.appkey, self.get_direction(), self.mic)
+        if self.mac_payload.get_fport() == 0x00:
+            return self.mac_payload.frm_payload.decrypt_payload(self.nwkey, self.get_direction(), self.mic)
+        else:
+            return self.mac_payload.frm_payload.decrypt_payload(self.appkey, self.get_direction(), self.mic)
 
     def derive_nwskey(self, devnonce):
         self.nwkey = self.mac_payload.frm_payload.derive_nwskey(self.appkey, devnonce)

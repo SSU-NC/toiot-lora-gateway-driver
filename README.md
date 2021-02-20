@@ -1,5 +1,7 @@
-# toiot-lora-sink-node-driver
-
+# toiot-LoRa2MQTT-Gateway (Simple Single Channel Gateway)
+This toiot single-channel gateway helps to communicate between LoRa and MQTT communication.   
+ ![Introduce](https://user-images.githubusercontent.com/49184890/108085783-0a5c1680-70b9-11eb-8d49-5b4d0961b098.jpg)   
+For more information on LoRaWAN, please refer to the following repository(https://github.com/gjlee0802/LoRaWAN-Study).   
 ### Installation (for Raspberry Pi)
 - Step 1   
 ~~~
