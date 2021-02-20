@@ -167,7 +167,7 @@ class LoRaWANrcv(LoRa):
             # If MacCommand is in FramePayload, handle this MacCommand
             if self.is_MacCommand == True:
                 if self.rx_devaddr in self.devaddr2nodeid:      # Important!: Can't handle MacCommand if nodeid was not received before.
-                    self.commandType, self.AnsCommand_payload = CID.handle_command_payload(lorawan, self.devaddr2nodeid[self.rx_devaddr], int(rx_msg), mqttclient)
+                    self.commandType, self.AnsCommand_payload = CID.handle_command_payload(lorawan, self.devaddr2nodeid[self.rx_devaddr], lorawan.get_payload(), mqttclient)
             else:
                 # If not MacCommand, MQTT Publish
                 mqttclient.publish(rx_msg.split(':')[0], rx_msg.split(':')[1]) # topic: 'data/nodeid', message: 'sensorid,value'

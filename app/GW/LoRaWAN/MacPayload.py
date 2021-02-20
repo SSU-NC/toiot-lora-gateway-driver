@@ -27,9 +27,9 @@ class MacPayload:
             self.frm_payload.read(mac_payload)
         elif mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.UNCONF_DATA_DOWN or\
                 mtype == MHDR.CONF_DATA_UP or mtype == MHDR.CONF_DATA_DOWN:
-            if self.fport!=0:
+            if self.fport!=0x00:
                 self.frm_payload = DataPayload()
-            elif self.fport==0:
+            elif self.fport==0x00:
                 self.frm_payload = MacCommandPayload()
             self.frm_payload.read(self, mac_payload[self.fhdr.length() + 1:])
 

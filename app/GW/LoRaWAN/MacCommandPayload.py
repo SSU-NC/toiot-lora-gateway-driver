@@ -16,9 +16,9 @@ class MacCommandPayload:
     def create(self, mac_payload, mtype, key, args):
         self.mac_payload = mac_payload
         
-        if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.CONF_DATA_UP:      #uplink
+        if mtype == MHDR.UNCONF_DATA_UP or mtype == MHDR.CONF_DATA_UP:          #uplink
             self.set_payload(key, 0x00, CID.create_command_payload(args))
-        elif mtype == MHDR.UNCONF_DATA_DOWN or mtype == MHDR.CONF_DATA_DOWN:  #downlink
+        elif mtype == MHDR.UNCONF_DATA_DOWN or mtype == MHDR.CONF_DATA_DOWN:    #downlink
             self.set_payload(key, 0x01, CID.create_command_payload(args))
 
     def length(self):
@@ -45,7 +45,7 @@ class MacCommandPayload:
 
         #Add data to it
         mic += [mhdr.to_raw()]  #add mhdr
-        mic += self.mac_payload.to_raw() #
+        mic += self.mac_payload.to_raw() 
 
         cmac = AES_CMAC()
         print(list(map(int, cmac.encode(bytes(key), bytes(mic))[:])))
