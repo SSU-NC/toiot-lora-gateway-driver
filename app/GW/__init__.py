@@ -144,7 +144,13 @@ class LoRaWANrcv(LoRa):
                 self.FCntUp_dict[self.rx_devaddr] = 0
             
             if self.is_MacCommand == False:                          # If FRMPayload is not MacCommand, update devaddr2nodeid.
-                self.devaddr2nodeid[self.rx_devaddr] = int(rx_msg.split(':')[0].split('/')[1]) # Matching devaddr - nodeid(int)
+                if self.rx_devaddr not in self.devaddr2nodeid:
+                    self.devaddr2nodeid[self.rx_devaddr] = int(rx_msg.split(':')[0].split('/')[1]) # Matching devaddr - nodeid(int)
+                    mqttclient.subscribe('command/downlink/DevStatusReq'+rx_msg.split(':')[0].split('/')[1])    # subscribe command/downlink/DevStatusReq/nodeid
+                elif self.devaddr2nodeid[self.rx_devaddr] != int(rx_msg.split(':')[0].split('/')[1]):
+                    mqttclient.unsubscribe('command/downlink/DevStatusReq/'+self.devaddr2nodeid[self.devaddr])      # unsubscribe before nodeid
+                    self.devaddr2nodeid[self.rx_devaddr] = int(rx_msg.split(':')[0].split('/')[1]) # Matching devaddr - nodeid(int)
+                    mqttclient.subscribe('command/downlink/DevStatusReq/'+rx_msg.split(':')[0].split('/')[1])    # subscribe command/downlink/DevStatusReq/nodeid
             
             print("Received Uplink FCnt: ", int.from_bytes(lorawan.get_mac_payload().get_fhdr().get_fcnt(), byteorder='little')\
                     ,"| Local FCntUp value",self.FCntUp_dict[self.rx_devaddr])
@@ -199,13 +205,15 @@ class LoRaWANrcv(LoRa):
                 lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
                             'fcnt':self.FCntDown_dict[self.rx_devaddr], \
                             'ACK':True, 'data':list(map(ord, 'ACK'))})
-                '''
+                
+                ''' 
+                #TEST MACCOMMAND
                 lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':rx_devaddr_list, \
                             'fcnt':self.FCntDown_dict[self.rx_devaddr], \
                             'cid':CID.DevStatusReq,\
                             'fport':0,\
                             'ACK':True})
-
+                
                 self.set_invert_iq(1)
                 self.set_invert_iq2(1)
                 self.write_payload(lorawan.to_raw())
@@ -256,7 +264,16 @@ def Init_client(cname):
     client.bad_connection_flag = False
     client.connected_flag = False
     client.disconnect_flag = False
+
+    client.message_callback_add("command/downlink/#", command_callback)
+
     return client
+
+def command_callback(client, userdata, msg):
+    v_topic = msg.topic.split('/')
+    if v_topic[2] == 'DevStatusReq':
+        print('Received DevStatusReq!')
+        
 
 def on_message(client, userdata, message):
     print("[MQTT] Received message: ",str(message.payload.decode("utf-8")),\
@@ -294,7 +311,6 @@ def on_disconnect(client, userdata, rc):
 # Init
 appnonce = [randrange(256), randrange(256), randrange(256)]
 netid = [0x00,0x00,0x01] #Type=0, NetID=1
-#devaddr = [0x26, 0x01, 0x11, 0x5F]
 dlsettings = [0x00]
 rxdelay = [0x00]
 cflist = []
@@ -302,8 +318,6 @@ cflist = []
 appkey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC1, 0x45, 0x6E, 0xC5, 0x45]
 nwskey = [0xC3, 0x24, 0x64, 0x98, 0xDE, 0x56, 0x5D, 0x8C, 0x55, 0x88, 0x7C, 0x05, 0x86, 0xF9, 0x82, 0x26]
 appskey = [0x15, 0xF6, 0xF4, 0xD4, 0x2A, 0x95, 0xB0, 0x97, 0x53, 0x27, 0xB7, 0xC1, 0x45, 0x6E, 0xC5, 0x45]
-#nwskey = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-#appskey = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
 
 

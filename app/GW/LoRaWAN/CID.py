@@ -110,7 +110,7 @@ class CID:
             battery = payload[1]
             radio_status = payload[2]
             status_dict = {'nodeid':nodeid, 'battery':battery, 'radio_status':radio_status} # Need end-device's id in this data
-            mqttclient.publish('DevStatusAns/' + str(nodeid), json.dumps(status_dict))
+            mqttclient.publish('command/uplink/DevStatusAns/' + str(nodeid), json.dumps(status_dict))
             print('[MQTT]: ',status_dict," Published via MQTT...")
             return CID.Ans, ans_payload
         elif cid == CID.NewChannelAns:
