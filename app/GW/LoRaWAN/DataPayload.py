@@ -32,7 +32,7 @@ class DataPayload:
         mic = [0x49]
         mic += [0x00, 0x00, 0x00, 0x00]
         mic += [direction]
-        print(self.mac_payload.get_fhdr().get_devaddr())
+        #print(self.mac_payload.get_fhdr().get_devaddr())
         mic += self.mac_payload.get_fhdr().get_devaddr()
         #print(self.mac_payload.get_fhdr().get_fcnt())
         mic += self.mac_payload.get_fhdr().get_fcnt()
@@ -51,7 +51,7 @@ class DataPayload:
         #print("before compute MIC: " + str(mic))
 
         cmac = AES_CMAC()
-        print(list(map(int, cmac.encode(bytes(key), bytes(mic))[:])))
+        #print(list(map(int, cmac.encode(bytes(key), bytes(mic))[:])))
         computed_mic = cmac.encode(bytes(key), bytes(mic))[:4]
 
         #print("computed MIC: " + str(list(map(int, computed_mic))))
@@ -104,7 +104,7 @@ class DataPayload:
 
         cipher = AES.new(bytes(key), AES.MODE_ECB)
         s = cipher.encrypt(bytes(a))
-        print("S: ",list(map(int,s)))
+        #print("S: ",list(map(int,s)))
         padded_payload = []
         for i in range(k):
             idx = (i + 1) * 16
