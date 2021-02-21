@@ -20,3 +20,11 @@ $ pip3 install -r requirements.txt
 $ cd toiot-lora-gateway-driver/app
 $ python3 run.py --b='MQTT_BROKER_IP' --p=port_number
 ```
+
+### Execution Results
+
+
+### HealthCheck
+The network server requires the gateway to send DevStatusReq every 30 seconds.   
+End-Devices answers DevStatusAns to provide information about the battery and radio_status.   
+
