@@ -45,6 +45,9 @@ class CID:
     DeviceModeInd       = 0x20
     DeviceModeConf      = 0x20
 
+    ActuatorReq         = 0x0E
+    ActuatorAns         = 0x0E
+
     # define command type
     Req = 0x00
     Ans = 0x01
@@ -87,10 +90,17 @@ class CID:
         elif args['cid'] == CID.DeviceTimeAns:
             payload+=args['seconds_since_epoch']    # 4 Octets (32bit unsigned int)
             payload+=args['fractional_second']      # 1 Octet (8bit unsigned int | second in (1/2)^8 sec steps)
-
+        
+        elif args['cid'] == CID.ActuatorReq:
+            payload+=args['aid']
+            for action_value in args['values']:
+                payload+=action_value['value']
+                payload+=action_value['sleep']
 
         return payload
 
+
+    # Handle Uplink Commands(End-dev to GW)
     def handle_command_payload(lorawan, nodeid, payload, mqttclient): # received mac command payload(received Frame Payload)
         cid = payload[0]
         ans_payload = []
