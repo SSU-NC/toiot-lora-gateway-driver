@@ -45,8 +45,8 @@ class LoRaWANrcv(LoRa):
 
         self.Req_from_server = dict()
     def on_rx_done(self):
+        loramac.set_MacState(LoRaMAC.LORAMAC_RX)
         self.clear_irq_flags(RxDone=1)
-        
         print("-------------------------------------RxDone")
         # Initialize values
         del self.rx_devaddr_list[:]
@@ -101,6 +101,7 @@ class LoRaWANrcv(LoRa):
             # Ignore same devnonce
             if str(rx_devnonce[0])+str(rx_devnonce[1]) in self.usedDevnonce:
                 print("Error: Received devnonce has been used already!")
+                LoRaMAC.set_MacState(LoRaMAC.LORAMAC_IDLE)
                 return
             self.usedDevnonce |= {str(rx_devnonce[0])+str(rx_devnonce[1])}
 
@@ -149,7 +150,8 @@ class LoRaWANrcv(LoRa):
             if lorawan.valid_mic() == False:
                 self.set_dio_mapping([0,0,0,0,0,0])
                 self.clear_irq_flags(RxDone=0)
-                print('[ERROR]: Invalid MIC ERROR...')
+                print('[ERROR] Invalid MIC ERROR...')
+                loramac.set_MacState(LoRaMAC.LORAMAC_IDLE)
                 return 
 
 
@@ -218,7 +220,7 @@ class LoRaWANrcv(LoRa):
                     self.FCntDown_dict[self.rx_devaddr] = 0
                 print('devaddr_list: ', self.rx_devaddr_list)
                
-                # Send MacCommand
+                # Send MacCommand with ACK
                 if self.devaddr2nodeid[self.rx_devaddr] in self.Req_from_server:
                     lorawan.create(MHDR.UNCONF_DATA_DOWN, dict(**{'devaddr':self.rx_devaddr_list, \
                             'fcnt':self.FCntDown_dict[self.rx_devaddr], \
@@ -229,7 +231,7 @@ class LoRaWANrcv(LoRa):
                     self.Req_from_server[self.devaddr2nodeid[self.rx_devaddr]].pop(0)
                     if len(self.Req_from_server[self.devaddr2nodeid[self.rx_devaddr]]) == 0:
                         del(self.Req_from_server[self.devaddr2nodeid[self.rx_devaddr]])
-                # Not MacCommand
+                # Not MacCommand, Only ACK
                 else:
                     lorawan.create(MHDR.UNCONF_DATA_DOWN, {'devaddr':self.rx_devaddr_list, \
                             'fcnt':self.FCntDown_dict[self.rx_devaddr], \
@@ -240,13 +242,12 @@ class LoRaWANrcv(LoRa):
                 self.write_payload(lorawan.to_raw())
                 self.set_dio_mapping([1,0,0,0,0,0])
                 self.set_mode(MODE.TX)
-
-        self.clear_irq_flags(RxDone=0)
+        loramac.set_MacState(LoRaMAC.LORAMAC_IDLE)
         print("--------------------------------------------\n")
     def on_tx_done(self):
+        loramac.set_MacState(LoRaMAC.LORAMAC_TX_RUNNING)
         self.set_mode(MODE.STDBY)
         self.clear_irq_flags(TxDone=1)
-
         
         # Update FCntDown
         if self.rx_devaddr not in self.FCntDown_dict:
@@ -260,7 +261,7 @@ class LoRaWANrcv(LoRa):
         self.set_invert_iq2(0)
         self.reset_ptr_rx()
         self.set_mode(MODE.RXCONT)
-        self.clear_irq_flags(TxDone = 0)
+        loramac.set_MacState(LoRaMAC.LORAMAC_IDLE)
 
     def start(self):
         self.set_invert_iq(0)
@@ -270,11 +271,10 @@ class LoRaWANrcv(LoRa):
         while True:
             sleep(.2)
             # When not Receiving or Sending...
-            if self.get_irq_flags()['rx_done']==0 and self.get_irq_flags()['tx_done']==0:
+            if loramac.get_MacState() == LoRaMAC.LORAMAC_IDLE:
                 # If any nodeid received Req, send MacCommand (not ACK)
                 if len(self.Req_from_server) > 0:
                     sorted_Reqlist = sorted(self.Req_from_server.items(), key = lambda x : len(x[1]), reverse=True)
-                    print(sorted_Reqlist)
                     nodeid2devaddr = {v: k for k, v in self.devaddr2nodeid.items()}
                     if sorted_Reqlist[0][0] in nodeid2devaddr:
                         str_devaddr = nodeid2devaddr[sorted_Reqlist[0][0]]
@@ -288,14 +288,14 @@ class LoRaWANrcv(LoRa):
                                 'fport':0}, **self.Req_from_server[sorted_Reqlist[0][0]][0]['payload']))
                         self.Req_from_server[sorted_Reqlist[0][0]].pop(0)
                         if len(self.Req_from_server[sorted_Reqlist[0][0]]) == 0:
-                            del(self.Req_from_server[sorted_Reqlist[0][0]])
+                            self.Req_from_server.pop(sorted_Reqlist[0][0])
                         self.set_invert_iq(1)
                         self.set_invert_iq2(1)
                         self.write_payload(lorawan.to_raw())
                         self.set_dio_mapping([1,0,0,0,0,0])
                         self.set_mode(MODE.TX)
                     else:
-                        del(self.Req_from_server[sorted_Reqlist[0][0]])
+                        self.Req_from_server.pop(sorted_Reqlist[0][0])
             sys.stdout.flush()
             
 def Init_client(cname):
@@ -332,12 +332,11 @@ def command_callback(client, userdata, msg):
     elif v_topic[2] == 'ActuatorReq':
         actuator_payload = json.loads(msg.payload)
         print('[MQTT] Received ActuatorReq!')
-        print('aid:'+str(actuator_payload['aid'])+' | values:'+str(actuator_payload['values']))
+        print('[ActuatorReq] aid:'+str(actuator_payload['aid'])+' | values:'+str(actuator_payload['values']))
         if int(v_topic[3]) not in lora.Req_from_server:
             lora.Req_from_server[int(v_topic[3])] = list()
         if int(v_topic[3]) in lora.devaddr2nodeid.values():
             lora.Req_from_server[int(v_topic[3])] += [{'cid':CID.ActuatorReq, 'payload':{'aid':actuator_payload['aid'], 'values':actuator_payload['values']}}]
-        
 
 def on_message(client, userdata, message):
     print("[MQTT] Received message: ",str(message.payload.decode("utf-8")),\
@@ -398,6 +397,7 @@ lora.set_pa_config(pa_select=1, max_power=0x0F, output_power=0x0E)
 lora.set_spreading_factor(8)
 lora.set_sync_word(0x34)
 lorawan = LoRaWAN.new(nwskey, appkey)
+loramac = LoRaMAC(LoRaMAC.LORAMAC_IDLE)
 
 lora.set_rx_crc(True)
 print(lora)
