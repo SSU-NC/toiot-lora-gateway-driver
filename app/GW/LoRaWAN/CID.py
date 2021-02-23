@@ -92,10 +92,10 @@ class CID:
             payload+=args['fractional_second']      # 1 Octet (8bit unsigned int | second in (1/2)^8 sec steps)
         
         elif args['cid'] == CID.ActuatorReq:
-            payload+=args['aid']
+            payload+=[args['aid']]
             for action_value in args['values']:
-                payload+=action_value['value']
-                payload+=action_value['sleep']
+                payload+=[action_value['value']]
+                payload+=[action_value['sleep']]
 
         return payload
 

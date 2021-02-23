@@ -6,6 +6,7 @@ from .SX127x.board_config import BOARD
 from random import randrange
 import paho.mqtt.client as mqtt
 
+import json
 import getmac
 
 from .setup import args
@@ -329,9 +330,9 @@ def command_callback(client, userdata, msg):
         if int(v_topic[3]) in lora.devaddr2nodeid.values():
             lora.Req_from_server[int(v_topic[3])] += [{'cid':CID.DevStatusReq, 'payload':dict()}]
     elif v_topic[2] == 'ActuatorReq':
-        actuator_payload = msg.payload
+        actuator_payload = json.loads(msg.payload)
         print('[MQTT] Received ActuatorReq!')
-        print('aid:',actuator_payload['aid'], ' | values:',actuator_payload['values'])
+        print('aid:'+str(actuator_payload['aid'])+' | values:'+str(actuator_payload['values']))
         if int(v_topic[3]) not in lora.Req_from_server:
             lora.Req_from_server[int(v_topic[3])] = list()
         if int(v_topic[3]) in lora.devaddr2nodeid.values():
