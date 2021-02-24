@@ -101,7 +101,7 @@ class LoRaWANrcv(LoRa):
             # Ignore same devnonce
             if str(rx_devnonce[0])+str(rx_devnonce[1]) in self.usedDevnonce:
                 print("Error: Received devnonce has been used already!")
-                LoRaMAC.set_MacState(LoRaMAC.LORAMAC_IDLE)
+                loramac.set_MacState(LoRaMAC.LORAMAC_IDLE)
                 return
             self.usedDevnonce |= {str(rx_devnonce[0])+str(rx_devnonce[1])}
 
@@ -278,24 +278,32 @@ class LoRaWANrcv(LoRa):
                     nodeid2devaddr = {v: k for k, v in self.devaddr2nodeid.items()}
                     if sorted_Reqlist[0][0] in nodeid2devaddr:
                         str_devaddr = nodeid2devaddr[sorted_Reqlist[0][0]]
+                        print(str_devaddr)
+                        if str_devaddr in self.nwskey_dict:
+                            lorawan.set_nwkey(self.nwskey_dict[str_devaddr])
+                        if str_devaddr in self.appskey_dict:
+                            lorawan.set_appkey(self.appskey_dict[str_devaddr])
+
                         list_devaddr = []
                         for i in range(4):
                             list_devaddr += [int(str_devaddr[i*2:i*2+2],16)]
-
-                        lorawan.create(MHDR.UNCONF_DATA_DOWN, dict(**{'devaddr': list_devaddr, \
-                                'fcnt':self.FCntDown_dict[self.rx_devaddr], \
-                                'cid':self.Req_from_server[sorted_Reqlist[0][0]][0]['cid'],\
-                                'fport':0}, **self.Req_from_server[sorted_Reqlist[0][0]][0]['payload']))
+                        if sorted_Reqlist[0][0] in self.Req_from_server:
+                            if len(self.Req_from_server[sorted_Reqlist[0][0]][0]) > 0:
+                                lorawan.create(MHDR.UNCONF_DATA_DOWN, dict(**{'devaddr': list_devaddr, \
+                                        'fcnt':self.FCntDown_dict[str_devaddr], \
+                                        'cid':self.Req_from_server[sorted_Reqlist[0][0]][0]['cid'],\
+                                        'fport':0}, **self.Req_from_server[sorted_Reqlist[0][0]][0]['payload']))
+                        print('target node: ', sorted_Reqlist[0][0])
                         self.Req_from_server[sorted_Reqlist[0][0]].pop(0)
                         if len(self.Req_from_server[sorted_Reqlist[0][0]]) == 0:
-                            self.Req_from_server.pop(sorted_Reqlist[0][0])
+                            del(self.Req_from_server[sorted_Reqlist[0][0]])
                         self.set_invert_iq(1)
                         self.set_invert_iq2(1)
                         self.write_payload(lorawan.to_raw())
                         self.set_dio_mapping([1,0,0,0,0,0])
                         self.set_mode(MODE.TX)
                     else:
-                        self.Req_from_server.pop(sorted_Reqlist[0][0])
+                        del(self.Req_from_server[sorted_Reqlist[0][0]])
             sys.stdout.flush()
             
 def Init_client(cname):
@@ -351,7 +359,7 @@ def on_publish(client, userdata, result):
     pass
 
 def on_subscribe(client, userdata, mid, granted_qos):
-    if mid != 0:
+    if mid == 0:
         print("[MQTT] Subscribe Failed..")
 def on_unsubscribe(client, userdata, mid):
     print("[MQTT] Successfully unsubscribed..")
