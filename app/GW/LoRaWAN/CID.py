@@ -45,6 +45,9 @@ class CID:
     DeviceModeInd       = 0x20
     DeviceModeConf      = 0x20
 
+    ActuatorReq         = 0x0E
+    ActuatorAns         = 0x0E
+
     # define command type
     Req = 0x00
     Ans = 0x01
@@ -87,10 +90,21 @@ class CID:
         elif args['cid'] == CID.DeviceTimeAns:
             payload+=args['seconds_since_epoch']    # 4 Octets (32bit unsigned int)
             payload+=args['fractional_second']      # 1 Octet (8bit unsigned int | second in (1/2)^8 sec steps)
-
+        
+        elif args['cid'] == CID.ActuatorReq:
+            payload_size = 1
+            payload+=[args['aid']]
+            for action_value in args['values']:
+                if payload_size>15:
+                    print('[WARNING] MacCommand payload size exceeded 15 Bytes...')
+                payload+=[action_value['value']]
+                payload+=[action_value['sleep']]
+                payload_size+=2
 
         return payload
 
+
+    # Handle Uplink Commands(End-dev to GW)
     def handle_command_payload(lorawan, nodeid, payload, mqttclient): # received mac command payload(received Frame Payload)
         cid = payload[0]
         ans_payload = []
@@ -110,7 +124,7 @@ class CID:
             battery = payload[1]
             radio_status = payload[2]
             status_dict = {'nodeid':nodeid, 'battery':battery, 'radio_status':radio_status} # Need end-device's id in this data
-            mqttclient.publish('DevStatusAns/' + str(nodeid), json.dumps(status_dict))
+            mqttclient.publish('command/uplink/DevStatusAns/' + str(nodeid), json.dumps(status_dict))
             print('[MQTT]: ',status_dict," Published via MQTT...")
             return CID.Ans, ans_payload
         elif cid == CID.NewChannelAns:
@@ -124,3 +138,5 @@ class CID:
         elif cid == CID.DeviceTimeReq:
             ans_payload += [CID.DeviceTimeReq]
             return CID.Req, ans_payload
+        elif cid == CID.ActuatorAns:
+            return CID.Ans, ans_payload
