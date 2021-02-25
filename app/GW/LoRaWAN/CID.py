@@ -92,10 +92,14 @@ class CID:
             payload+=args['fractional_second']      # 1 Octet (8bit unsigned int | second in (1/2)^8 sec steps)
         
         elif args['cid'] == CID.ActuatorReq:
-            payload+=args['aid']
+            payload_size = 1
+            payload+=[args['aid']]
             for action_value in args['values']:
-                payload+=action_value['value']
-                payload+=action_value['sleep']
+                if payload_size>15:
+                    print('[WARNING] MacCommand payload size exceeded 15 Bytes...')
+                payload+=[action_value['value']]
+                payload+=[action_value['sleep']]
+                payload_size+=2
 
         return payload
 
@@ -134,3 +138,5 @@ class CID:
         elif cid == CID.DeviceTimeReq:
             ans_payload += [CID.DeviceTimeReq]
             return CID.Req, ans_payload
+        elif cid == CID.ActuatorAns:
+            return CID.Ans, ans_payload
